@@ -10,6 +10,7 @@ type FormRepository interface {
 
 	GetTemplateBySchedule(scheduleID string) (*domain.FormTemplate, error)
 	GetTemplateByID(templateID string) (*domain.FormTemplate, error)
+	GetActiveByPeriod(period string) (*domain.FormTemplate, error)
 
 	ListTemplates() ([]domain.FormTemplate, error)
 	SetActive(id string, active bool) error

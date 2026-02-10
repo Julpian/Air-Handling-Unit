@@ -1,9 +1,10 @@
 package usecase
 
 import (
+	"errors"
+
 	"ahu-backend/internal/domain"
 	"ahu-backend/internal/repository"
-	"errors"
 )
 
 type GetFormByInspectionUsecase struct {
@@ -21,18 +22,15 @@ func NewGetFormByInspectionUsecase(
 	}
 }
 
-func (uc *GetFormByInspectionUsecase) Execute(
+func (u *GetFormByInspectionUsecase) Execute(
 	inspectionID string,
 ) (*domain.FormTemplate, error) {
 
-	inspection, err := uc.inspectionRepo.GetByID(inspectionID)
+	inspection, err := u.inspectionRepo.GetByID(inspectionID)
 	if err != nil || inspection == nil {
 		return nil, errors.New("inspection tidak ditemukan")
 	}
 
-	if inspection.FormTemplateID == "" {
-		return nil, errors.New("form template belum terpasang")
-	}
-
-	return uc.formRepo.GetTemplateByID(inspection.FormTemplateID)
+	// 🔥 AMBIL FORM BERDASARKAN ID YANG SUDAH TERKUNCI
+	return u.formRepo.GetTemplateByID(inspection.FormTemplateID)
 }

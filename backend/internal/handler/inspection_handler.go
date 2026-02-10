@@ -61,27 +61,45 @@ func (h *InspectionHandler) Detail(c *gin.Context) {
 
 // ================= SCAN NFC =================
 func (h *InspectionHandler) ScanNFC(c *gin.Context) {
-	var req scanNFCRequest
+	var req struct {
+		NFCUID string `json:"nfc_uid"`
+	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	if req.NFCUID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "nfc_uid wajib"})
+		return
+	}
+
+	// ambil inspector dari JWT
+	inspectorID := c.GetString("user_id")
 
 	inspection, err := h.inspectionUC.ScanNFC(
 		req.NFCUID,
-		req.ScheduleID,
-		req.InspectorID,
+		inspectorID,
 	)
+
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// VALIDASI inspector
+	if inspection.InspectorID != "" && inspection.InspectorID != inspectorID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "jadwal ini bukan milik anda",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, inspection)
+	// 🔥 RESPONSE MINIMAL UNTUK FRONTEND
+	c.JSON(http.StatusOK, gin.H{
+		"id": inspection.ID,
+	})
 }
 
 // ================= DROPDOWN (ADMIN) =================

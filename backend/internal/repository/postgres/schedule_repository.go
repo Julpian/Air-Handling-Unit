@@ -132,31 +132,31 @@ func (r *SchedulePostgresRepository) ListAll() ([]domain.Schedule, error) {
 
 func (r *SchedulePostgresRepository) ListWithDetail() ([]*domain.ScheduleWithDetail, error) {
 	query := `
-		SELECT
-		s.id,
-		s.start_date,
-		s.end_date,
-		s.status,
-		s.nfc_bypass,
+	SELECT
+	s.id,
+	s.start_date,
+	s.end_date,
+	s.status,
+	s.nfc_bypass,
 
-		sp.id AS plan_id,
-		sp.period,
-		sp.week_of_month,
-		sp.month,
+	sp.id AS plan_id,
+	sp.period,
+	sp.week_of_month,
+	sp.month,
 
-		a.id AS ahu_id,
-		a.unit_code AS unit_code,
-		a.room_name,
-		a.nfc_uid,
+	a.id AS ahu_id,
+	a.unit_code,
+	a.room_name,
+	a.nfc_uid,
 
-		s.inspector_id,
-		u.name AS inspector_name
+	s.inspector_id,
+	u.name AS inspector_name
 
-		FROM schedules s
-		JOIN schedule_plans sp ON sp.id = s.plan_id
-		JOIN ahus a ON a.id = s.ahu_id
-		LEFT JOIN users u ON u.id = s.inspector_id
-		ORDER BY s.start_date ASC
+	FROM schedules s
+	JOIN schedule_plans sp ON sp.id = s.plan_id
+	JOIN ahus a ON a.id = s.ahu_id
+	LEFT JOIN users u ON u.id = s.inspector_id
+	ORDER BY s.start_date ASC
 	`
 
 	rows, err := r.db.Query(context.Background(), query)
@@ -294,17 +294,18 @@ func (r *SchedulePostgresRepository) GetActiveByAHU(
 ) (*domain.Schedule, error) {
 
 	query := `
-		SELECT
-			s.id,
-			s.plan_id,
-			s.status,
-			s.created_at
-		FROM schedules s
-		JOIN schedule_plans sp ON sp.id = s.plan_id
-		WHERE sp.ahu_id = $1
-		  AND s.status = 'siap_diperiksa'
-		ORDER BY s.created_at DESC
-		LIMIT 1
+	SELECT
+		s.id,
+		s.plan_id,
+		sp.period,
+		s.status,
+		s.created_at
+	FROM schedules s
+	JOIN schedule_plans sp ON sp.id = s.plan_id
+	WHERE sp.ahu_id = $1
+	  AND s.status = 'siap_diperiksa'
+	ORDER BY s.created_at DESC
+	LIMIT 1
 	`
 
 	row := r.db.QueryRow(context.Background(), query, ahuID)
@@ -313,6 +314,7 @@ func (r *SchedulePostgresRepository) GetActiveByAHU(
 	err := row.Scan(
 		&s.ID,
 		&s.PlanID,
+		&s.Period, // 🔥 TAMBAHKAN
 		&s.Status,
 		&s.CreatedAt,
 	)

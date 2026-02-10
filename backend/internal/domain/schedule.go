@@ -7,6 +7,8 @@ type Schedule struct {
 	PlanID string
 	AHUId  string
 
+	Period string
+
 	StartDate time.Time
 	EndDate   time.Time
 

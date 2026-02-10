@@ -187,3 +187,26 @@ func (r *InspectionPostgresRepository) ListByStatus(status string) ([]domain.Ins
 
 	return inspections, nil
 }
+
+func (r *InspectionPostgresRepository) SaveResult(
+	res *domain.InspectionResult,
+) error {
+
+	_, err := r.db.Exec(context.Background(), `
+	INSERT INTO inspection_results (
+		id,
+		inspection_id,
+		item_id,
+		value,
+		created_at
+	)
+	VALUES ($1,$2,$3,$4,now())
+	`,
+		res.ID,
+		res.InspectionID,
+		res.ItemID,
+		res.Value,
+	)
+
+	return err
+}

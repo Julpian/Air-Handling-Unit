@@ -396,3 +396,26 @@ func (r *FormPostgresRepository) ListTemplateVersions(templateID string) ([]doma
 
 	return result, nil
 }
+
+func (r *FormPostgresRepository) GetActiveByPeriod(
+	period string,
+) (*domain.FormTemplate, error) {
+
+	query := `
+	SELECT id, name, period
+	FROM form_templates
+	WHERE is_active = true AND period = $1
+	LIMIT 1
+	`
+
+	var f domain.FormTemplate
+
+	err := r.db.QueryRow(context.Background(), query, period).
+		Scan(&f.ID, &f.Name, &f.Period)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &f, nil
+}

@@ -12,6 +12,7 @@ type InspectionRepository interface {
 
 	ExistsApproved(scheduleID string) (bool, error)
 	ListByStatus(status string) ([]domain.Inspection, error)
+	SaveResult(result *domain.InspectionResult) error
 
 	Approve(
 		inspectionID string,

@@ -16,15 +16,17 @@ func NewInspectionFormHandler(
 	getFormUC *usecase.GetFormByInspectionUsecase,
 	submitUC *usecase.SubmitInspectionFormUsecase,
 ) *InspectionFormHandler {
-	return &InspectionFormHandler{getFormUC: getFormUC, submitUC: submitUC}
+	return &InspectionFormHandler{
+		getFormUC: getFormUC,
+		submitUC:  submitUC,
+	}
 }
 
-func (h *InspectionFormHandler) Submit(
-	c *gin.Context,
-) {
+func (h *InspectionFormHandler) Submit(c *gin.Context) {
 	inspectionID := c.Param("inspection_id")
 
 	var req dto.SubmitInspectionFormRequest
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
@@ -35,12 +37,12 @@ func (h *InspectionFormHandler) Submit(
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "inspection submitted"})
+	c.JSON(200, gin.H{
+		"message": "inspection submitted",
+	})
 }
 
-func (h *InspectionFormHandler) GetForm(
-	c *gin.Context,
-) {
+func (h *InspectionFormHandler) GetForm(c *gin.Context) {
 	inspectionID := c.Param("inspection_id")
 
 	form, err := h.getFormUC.Execute(inspectionID)

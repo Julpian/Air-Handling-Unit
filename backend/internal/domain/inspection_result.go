@@ -6,6 +6,8 @@ type InspectionResult struct {
 	ID           string
 	InspectionID string
 	FormItemID   string
+	ItemID       string
+	Value        string
 
 	ValueText   *string
 	ValueNumber *float64

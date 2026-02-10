@@ -37,7 +37,7 @@ func NewInspectionUsecase(
 
 // ScanNFC memulai pemeriksaan dengan scan NFC
 func (u *InspectionUsecase) ScanNFC(
-	nfcUID, _ string,
+	nfcUID string,
 	inspectorID string,
 ) (*domain.Inspection, error) {
 
@@ -59,7 +59,7 @@ func (u *InspectionUsecase) ScanNFC(
 	}
 
 	// 4. Ambil form template
-	form, err := u.formRepo.GetTemplateBySchedule(schedule.ID)
+	form, err := u.formRepo.GetActiveByPeriod(schedule.Period)
 	if err != nil || form == nil {
 		return nil, errors.New("form inspeksi tidak ditemukan")
 	}
@@ -116,27 +116,23 @@ func (u *InspectionUsecase) SubmitInspection(
 		return errors.New("inspection tidak dalam status yang valid")
 	}
 
-	// Update status inspection
+	for _, r := range results {
+		r.ID = uuid.NewString()
+		r.InspectionID = inspectionID
+
+		if err := u.inspectionRepo.SaveResult(&r); err != nil {
+			return err
+		}
+	}
+
+	// inspection → terkirim
 	if err := u.inspectionRepo.UpdateStatus(
-		inspection.ID,
+		inspectionID,
 		domain.InspectionStatusTerkirim,
 		nil,
 	); err != nil {
 		return err
 	}
-
-	// ❗ Schedule JANGAN selesai di sini
-	// Schedule menunggu keputusan supervisor
-
-	// Audit
-	_ = u.auditRepo.Save(&domain.AuditTrail{
-		ID:        uuid.NewString(),
-		UserID:    inspectorID,
-		Action:    "submit_inspection",
-		Entity:    "Inspection",
-		EntityID:  inspection.ID,
-		CreatedAt: time.Now(),
-	})
 
 	return nil
 }
