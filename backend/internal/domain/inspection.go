@@ -13,6 +13,9 @@ type Inspection struct {
 	Status string  // pending | inspected | approved | rejected
 	Note   *string // catatan jika reject / remark
 
+	ScanToken        *string
+	ScanTokenExpires *time.Time
+
 	ScannedNFCUID *string    // UID NFC yang discan
 	InspectedAt   *time.Time // waktu scan NFC dilakukan
 

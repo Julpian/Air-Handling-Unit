@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"ahu-backend/internal/domain"
 
@@ -22,18 +23,20 @@ func NewInspectionPostgresRepository(db *pgxpool.Pool) *InspectionPostgresReposi
 
 func (r *InspectionPostgresRepository) Create(i *domain.Inspection) error {
 	query := `
-		INSERT INTO inspections (
-			id,
-			schedule_id,
-			inspector_id,
-			form_template_id,
-			status,
-			scanned_nfc_uid,
-			inspected_at,
-			parent_id,
-			created_at
-		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now())
+	INSERT INTO inspections (
+		id,
+		schedule_id,
+		inspector_id,
+		form_template_id,
+		status,
+		scanned_nfc_uid,
+		inspected_at,
+		scan_token,
+		scan_token_expires_at,
+		parent_id,
+		created_at
+	)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now())
 	`
 
 	_, err := r.db.Exec(
@@ -42,10 +45,12 @@ func (r *InspectionPostgresRepository) Create(i *domain.Inspection) error {
 		i.ID,
 		i.ScheduleID,
 		i.InspectorID,
-		i.FormTemplateID, // 🔥 INI PENTING
+		i.FormTemplateID,
 		i.Status,
 		i.ScannedNFCUID,
-		i.InspectedAt,
+		i.InspectedAt,      // ✅
+		i.ScanToken,        // ✅
+		i.ScanTokenExpires, // ✅
 		i.ParentID,
 	)
 
@@ -56,19 +61,21 @@ func (r *InspectionPostgresRepository) Create(i *domain.Inspection) error {
 
 func (r *InspectionPostgresRepository) GetByID(id string) (*domain.Inspection, error) {
 	query := `
-		SELECT
-			id,
-			schedule_id,
-			inspector_id,
-			form_template_id,
-			status,
-			note,
-			scanned_nfc_uid,
-			inspected_at,
-			parent_id,
-			created_at
-		FROM inspections
-		WHERE id = $1
+	SELECT
+		id,
+		schedule_id,
+		inspector_id,
+		form_template_id,
+		status,
+		note,
+		scanned_nfc_uid,
+		inspected_at,
+		scan_token,
+		scan_token_expires_at,
+		parent_id,
+		created_at
+	FROM inspections
+	WHERE id = $1
 	`
 
 	var i domain.Inspection
@@ -82,6 +89,8 @@ func (r *InspectionPostgresRepository) GetByID(id string) (*domain.Inspection, e
 		&i.Note,
 		&i.ScannedNFCUID,
 		&i.InspectedAt,
+		&i.ScanToken,        // ✅
+		&i.ScanTokenExpires, // ✅
 		&i.ParentID,
 		&i.CreatedAt,
 	)
@@ -96,8 +105,32 @@ func (r *InspectionPostgresRepository) GetByID(id string) (*domain.Inspection, e
 	return &i, nil
 }
 
-func (r *InspectionPostgresRepository) GetByScheduleID(scheduleID string) (*domain.Inspection, error) {
-	return nil, nil
+func (r *InspectionPostgresRepository) GetByScheduleID(
+	scheduleID string,
+) (*domain.Inspection, error) {
+
+	var i domain.Inspection
+
+	err := r.db.QueryRow(context.Background(), `
+	SELECT id, schedule_id, status, form_template_id
+	FROM inspections
+	WHERE schedule_id=$1
+	LIMIT 1
+	`, scheduleID).Scan(
+		&i.ID,
+		&i.ScheduleID,
+		&i.Status,
+		&i.FormTemplateID,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &i, nil
 }
 
 func (r *InspectionPostgresRepository) UpdateStatus(
@@ -206,6 +239,40 @@ func (r *InspectionPostgresRepository) SaveResult(
 		res.InspectionID,
 		res.ItemID,
 		res.Value,
+	)
+
+	return err
+}
+
+func (r *InspectionPostgresRepository) ClearScanToken(id string) error {
+	_, err := r.db.Exec(context.Background(), `
+	UPDATE inspections
+	SET scan_token = NULL,
+	    scan_token_expires_at = NULL
+	WHERE id = $1
+	`, id)
+
+	return err
+}
+
+func (r *InspectionPostgresRepository) SetScanToken(
+	id string,
+	token string,
+	exp time.Time,
+	uid string,
+) error {
+
+	_, err := r.db.Exec(context.Background(), `
+	UPDATE inspections
+	SET scan_token=$1,
+	    scan_token_expires_at=$2,
+	    scanned_nfc_uid=$3
+	WHERE id=$4
+	`,
+		token,
+		exp,
+		uid,
+		id,
 	)
 
 	return err

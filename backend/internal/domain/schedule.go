@@ -16,4 +16,6 @@ type Schedule struct {
 	Status      string
 	NFCBypass   bool
 	CreatedAt   time.Time
+
+	FormTemplateID string
 }

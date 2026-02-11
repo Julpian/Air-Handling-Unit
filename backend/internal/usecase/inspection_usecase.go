@@ -48,7 +48,21 @@ func (u *InspectionUsecase) ScanNFC(
 	}
 
 	// 2. Cari schedule aktif dari AHU
-	schedule, err := u.scheduleRepo.GetActiveByAHU(ahu.ID)
+	schedule, err := u.scheduleRepo.GetActiveByAHUAndInspector(
+		ahu.ID,
+		inspectorID,
+	)
+	if schedule == nil {
+		return nil, errors.New("schedule bukan milik anda atau belum ditugaskan")
+	}
+
+	if schedule.InspectorID == nil {
+		return nil, errors.New("schedule belum punya inspector")
+	}
+
+	if *schedule.InspectorID != inspectorID {
+		return nil, errors.New("schedule bukan milik anda")
+	}
 	if err != nil || schedule == nil {
 		return nil, errors.New("tidak ada jadwal aktif")
 	}
@@ -72,14 +86,23 @@ func (u *InspectionUsecase) ScanNFC(
 
 	now := time.Now()
 
+	scanToken := uuid.NewString()
+	expires := time.Now().Add(10 * time.Minute)
+
 	inspection := &domain.Inspection{
-		ID:             uuid.NewString(),
+		ID: uuid.NewString(),
+
 		ScheduleID:     schedule.ID,
 		InspectorID:    inspectorID,
 		FormTemplateID: form.ID,
-		Status:         domain.InspectionStatusSedangDiisi,
-		ScannedNFCUID:  &nfcUID,
-		InspectedAt:    &now,
+
+		Status:        domain.InspectionStatusSedangDiisi,
+		ScannedNFCUID: &nfcUID,
+
+		ScanToken:        &scanToken,
+		ScanTokenExpires: &expires,
+
+		InspectedAt: &now,
 	}
 
 	if last != nil && last.Status == "revisi" {

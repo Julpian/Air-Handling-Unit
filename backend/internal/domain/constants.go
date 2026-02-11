@@ -25,6 +25,7 @@ const (
 	ScheduleStatusSiapDiperiksa    = "siap_diperiksa"
 	ScheduleStatusDalamPemeriksaan = "dalam_pemeriksaan"
 	ScheduleStatusSelesai          = "selesai"
+	ScheduleStatusRevisi           = "revisi"
 )
 
 // =======================

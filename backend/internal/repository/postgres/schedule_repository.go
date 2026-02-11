@@ -5,6 +5,7 @@ import (
 
 	"ahu-backend/internal/domain"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -289,39 +290,44 @@ func (r *SchedulePostgresRepository) UpdateStatus(
 	return err
 }
 
-func (r *SchedulePostgresRepository) GetActiveByAHU(
+func (r *SchedulePostgresRepository) GetActiveByAHUAndInspector(
 	ahuID string,
+	inspectorID string,
 ) (*domain.Schedule, error) {
 
 	query := `
 	SELECT
 		s.id,
 		s.plan_id,
-		sp.period,
+		s.inspector_id,
 		s.status,
-		s.created_at
+		sp.form_template_id
 	FROM schedules s
 	JOIN schedule_plans sp ON sp.id = s.plan_id
-	WHERE sp.ahu_id = $1
+	WHERE s.ahu_id = $1
+	  AND s.inspector_id = $2
 	  AND s.status = 'siap_diperiksa'
-	ORDER BY s.created_at DESC
+	  AND now() BETWEEN s.start_date AND s.end_date
+	ORDER BY s.start_date ASC
 	LIMIT 1
 	`
 
-	row := r.db.QueryRow(context.Background(), query, ahuID)
-
 	var s domain.Schedule
-	err := row.Scan(
+
+	err := r.db.QueryRow(context.Background(), query,
+		ahuID,
+		inspectorID,
+	).Scan(
 		&s.ID,
 		&s.PlanID,
-		&s.Period, // 🔥 TAMBAHKAN
+		&s.InspectorID,
 		&s.Status,
-		&s.CreatedAt,
+		&s.FormTemplateID,
 	)
 
-	if err != nil {
-		return nil, err
+	if err == pgx.ErrNoRows {
+		return nil, nil
 	}
 
-	return &s, nil
+	return &s, err
 }

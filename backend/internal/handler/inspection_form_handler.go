@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 
 	"ahu-backend/internal/usecase"
@@ -44,6 +46,28 @@ func (h *InspectionFormHandler) Submit(c *gin.Context) {
 
 func (h *InspectionFormHandler) GetForm(c *gin.Context) {
 	inspectionID := c.Param("inspection_id")
+	token := c.Query("token")
+
+	if token == "" {
+		c.JSON(403, gin.H{"error": "missing token"})
+		return
+	}
+
+	inspection, err := h.submitUC.GetInspection(inspectionID)
+	if err != nil || inspection == nil {
+		c.JSON(404, gin.H{"error": "inspection not found"})
+		return
+	}
+
+	if inspection.ScanToken == nil || token != *inspection.ScanToken {
+		c.JSON(403, gin.H{"error": "token invalid"})
+		return
+	}
+
+	if inspection.ScanTokenExpires.Before(time.Now()) {
+		c.JSON(403, gin.H{"error": "token expired"})
+		return
+	}
 
 	form, err := h.getFormUC.Execute(inspectionID)
 	if err != nil {

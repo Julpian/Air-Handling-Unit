@@ -12,20 +12,23 @@ import (
 )
 
 type SubmitInspectionFormUsecase struct {
-	resultRepo  repository.InspectionResultRepository
-	inspectRepo repository.InspectionRepository
-	formRepo    repository.FormRepository
+	resultRepo   repository.InspectionResultRepository
+	inspectRepo  repository.InspectionRepository
+	formRepo     repository.FormRepository
+	scheduleRepo repository.ScheduleRepository //
 }
 
 func NewSubmitInspectionFormUsecase(
 	resultRepo repository.InspectionResultRepository,
 	inspectionRepo repository.InspectionRepository,
 	formRepo repository.FormRepository,
+	scheduleRepo repository.ScheduleRepository, // 🔥 TAMBAH
 ) *SubmitInspectionFormUsecase {
 	return &SubmitInspectionFormUsecase{
-		resultRepo:  resultRepo,
-		inspectRepo: inspectionRepo,
-		formRepo:    formRepo,
+		resultRepo:   resultRepo,
+		inspectRepo:  inspectionRepo,
+		formRepo:     formRepo,
+		scheduleRepo: scheduleRepo,
 	}
 }
 
@@ -116,6 +119,23 @@ func (uc *SubmitInspectionFormUsecase) Execute(
 	}
 
 	// ===============================
+	// UPDATE SCHEDULE STATUS
+	// ===============================
+
+	scheduleStatus := domain.ScheduleStatusSelesai
+
+	if finalResult == "fail" {
+		scheduleStatus = domain.ScheduleStatusRevisi
+	}
+
+	if err := uc.scheduleRepo.UpdateStatus(
+		inspection.ScheduleID,
+		scheduleStatus,
+	); err != nil {
+		return err
+	}
+
+	// ===============================
 	// UPDATE INSPECTION STATUS
 	// ===============================
 	status := "inspected"
@@ -123,9 +143,15 @@ func (uc *SubmitInspectionFormUsecase) Execute(
 		status = "rejected"
 	}
 
+	uc.inspectRepo.ClearScanToken(inspectionID)
+
 	return uc.inspectRepo.UpdateStatus(
 		inspectionID,
 		status,
 		nil,
 	)
+}
+
+func (uc *SubmitInspectionFormUsecase) GetInspection(id string) (*domain.Inspection, error) {
+	return uc.inspectRepo.GetByID(id)
 }

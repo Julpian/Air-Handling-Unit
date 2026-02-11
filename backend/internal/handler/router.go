@@ -35,7 +35,10 @@ func RegisterRoutes(
 			inspector.GET("", inspectionHandler.List)
 			inspector.GET("/dashboard", inspectionHandler.Dashboard)
 			inspector.GET("/:inspection_id/detail", inspectionHandler.Detail)
+
+			// NFC SCAN (SATU SAJA)
 			inspector.POST("/scan-nfc", inspectionHandler.ScanNFC)
+
 			inspector.POST("/:inspection_id/form/submit", inspectionFormHandler.Submit)
 			inspector.GET("/:inspection_id/form", inspectionFormHandler.GetForm)
 		}

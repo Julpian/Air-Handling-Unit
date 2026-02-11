@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"ahu-backend/internal/usecase"
+	"ahu-backend/internal/usecase/dto"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,17 +16,20 @@ type scanNFCRequest struct {
 }
 
 type InspectionHandler struct {
-	inspectionUC *usecase.InspectionUsecase
-	queryUC      *usecase.InspectionQueryUsecase
+	inspectionUC   *usecase.InspectionUsecase
+	queryUC        *usecase.InspectionQueryUsecase
+	scanNFCUsecase *usecase.ScanNFCUsecase // 🔥 TAMBAH INI
 }
 
 func NewInspectionHandler(
 	inspectionUC *usecase.InspectionUsecase,
 	queryUC *usecase.InspectionQueryUsecase,
+	scanNFCUsecase *usecase.ScanNFCUsecase, // 🔥 TAMBAH PARAMETER
 ) *InspectionHandler {
 	return &InspectionHandler{
-		inspectionUC: inspectionUC,
-		queryUC:      queryUC,
+		inspectionUC:   inspectionUC,
+		queryUC:        queryUC,
+		scanNFCUsecase: scanNFCUsecase, // 🔥 SIMPAN
 	}
 }
 
@@ -61,45 +65,22 @@ func (h *InspectionHandler) Detail(c *gin.Context) {
 
 // ================= SCAN NFC =================
 func (h *InspectionHandler) ScanNFC(c *gin.Context) {
-	var req struct {
-		NFCUID string `json:"nfc_uid"`
-	}
+	var req dto.ScanNFCRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"message": "request tidak valid"})
 		return
 	}
 
-	if req.NFCUID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "nfc_uid wajib"})
-		return
-	}
-
-	// ambil inspector dari JWT
 	inspectorID := c.GetString("user_id")
 
-	inspection, err := h.inspectionUC.ScanNFC(
-		req.NFCUID,
-		inspectorID,
-	)
-
+	res, err := h.scanNFCUsecase.Execute(req, inspectorID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"message": err.Error()})
 		return
 	}
 
-	// VALIDASI inspector
-	if inspection.InspectorID != "" && inspection.InspectorID != inspectorID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "jadwal ini bukan milik anda",
-		})
-		return
-	}
-
-	// 🔥 RESPONSE MINIMAL UNTUK FRONTEND
-	c.JSON(http.StatusOK, gin.H{
-		"id": inspection.ID,
-	})
+	c.JSON(200, res)
 }
 
 // ================= DROPDOWN (ADMIN) =================

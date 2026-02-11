@@ -75,12 +75,15 @@ func main() {
 	getFormUC := usecase.NewGetFormByInspectionUsecase(
 		inspectionRepo,
 		formRepo,
+		ahuRepo,
+		scheduleRepo,
 	)
 
 	submitInspectionFormUC := usecase.NewSubmitInspectionFormUsecase(
 		inspectionResultRepo,
 		inspectionRepo,
 		formRepo,
+		scheduleRepo, // 🔥 TAMBAH
 	)
 
 	authUC := usecase.NewAuthUsecase(userRepo)
@@ -97,9 +100,16 @@ func main() {
 		auditRepo,
 	)
 
+	scanNFCUsecase := usecase.NewScanNFCUsecase(
+		ahuRepo,
+		scheduleRepo,
+		inspectionRepo,
+	)
+
 	inspectionHandler := handler.NewInspectionHandler(
 		inspectionUC,
 		inspectionQueryUC,
+		scanNFCUsecase,
 	)
 
 	inspectionApprovalUC := usecase.NewInspectionApprovalUsecase(
@@ -150,17 +160,26 @@ func main() {
 	// ================= ROUTER =================
 	r := gin.Default()
 
-	// 🔥 TAMBAHKAN INI
-	r.MaxMultipartMemory = 8 << 20 // 8 MB
+	// 🔥 STATIC & LIMIT
+	r.MaxMultipartMemory = 8 << 20
 	r.Static("/uploads", "./uploads")
 
+	// 🔥 PASANG CORS DI SINI
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowOrigins: []string{
+			"http://localhost:3000",
+			"http://10.9.119.76:3000", // HP / LAN
+		},
+		AllowMethods: []string{
+			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
+		},
+		AllowHeaders: []string{
+			"Origin", "Content-Type", "Authorization",
+		},
 		AllowCredentials: true,
 	}))
 
+	// ================= REGISTER ROUTES =================
 	handler.RegisterRoutes(
 		r,
 		handlers,
@@ -172,5 +191,6 @@ func main() {
 		inspectionFormHandler,
 	)
 
-	r.Run(":8080")
+	// ================= RUN SERVER =================
+	r.Run("0.0.0.0:8080")
 }
