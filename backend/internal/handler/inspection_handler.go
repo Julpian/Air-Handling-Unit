@@ -68,14 +68,21 @@ func (h *InspectionHandler) ScanNFC(c *gin.Context) {
 	var req dto.ScanNFCRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"message": "request tidak valid"})
+		c.JSON(400, gin.H{"message": err.Error()})
 		return
 	}
 
 	inspectorID := c.GetString("user_id")
 
+	// 🔥 DEBUG
+	println("NFC:", req.NFCUID)
+	println("INSPECTOR:", inspectorID)
+
 	res, err := h.scanNFCUsecase.Execute(req, inspectorID)
 	if err != nil {
+		// 🔥 INI PENTING
+		println("SCAN ERROR:", err.Error())
+
 		c.JSON(400, gin.H{"message": err.Error()})
 		return
 	}

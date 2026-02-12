@@ -290,9 +290,8 @@ func (r *SchedulePostgresRepository) UpdateStatus(
 	return err
 }
 
-func (r *SchedulePostgresRepository) GetActiveByAHUAndInspector(
+func (r *SchedulePostgresRepository) GetActiveByAHU(
 	ahuID string,
-	inspectorID string,
 ) (*domain.Schedule, error) {
 
 	query := `
@@ -305,19 +304,16 @@ func (r *SchedulePostgresRepository) GetActiveByAHUAndInspector(
 	FROM schedules s
 	JOIN schedule_plans sp ON sp.id = s.plan_id
 	WHERE s.ahu_id = $1
-	  AND s.inspector_id = $2
+	  AND s.inspector_id IS NOT NULL   -- 🔥 FIX
 	  AND s.status = 'siap_diperiksa'
-	  AND now() BETWEEN s.start_date AND s.end_date
-	ORDER BY s.start_date ASC
+	  AND CURRENT_DATE BETWEEN s.start_date AND s.end_date
+	ORDER BY s.created_at DESC
 	LIMIT 1
 	`
 
 	var s domain.Schedule
 
-	err := r.db.QueryRow(context.Background(), query,
-		ahuID,
-		inspectorID,
-	).Scan(
+	err := r.db.QueryRow(context.Background(), query, ahuID).Scan(
 		&s.ID,
 		&s.PlanID,
 		&s.InspectorID,

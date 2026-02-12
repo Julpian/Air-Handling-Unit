@@ -38,72 +38,77 @@ func (uc *ScanNFCUsecase) Execute(
 		return nil, errors.New("nfc uid wajib")
 	}
 
-	// 1️⃣ AHU
+	// 1️⃣ Ambil AHU
 	ahu, err := uc.ahuRepo.GetByNFCUID(req.NFCUID)
-	if err != nil || ahu == nil {
-		return nil, errors.New("nfc tidak terdaftar")
-	}
-
-	// 2️⃣ Schedule aktif
-	schedule, err := uc.scheduleRepo.GetActiveByAHUAndInspector(
-		ahu.ID,
-		inspectorID,
-	)
-	if err != nil || schedule == nil {
-		return nil, errors.New("tidak ada jadwal aktif")
-	}
-
-	// 3️⃣ Inspection
-	inspection, err := uc.inspectionRepo.GetByScheduleID(schedule.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if schedule.InspectorID == nil {
-		return nil, errors.New("inspector belum ditentukan")
+	if ahu == nil {
+		return nil, errors.New("nfc tidak terdaftar")
 	}
 
-	// 4️⃣ JIKA BELUM ADA → BUAT BARU
-	if inspection == nil {
-
-		if schedule.FormTemplateID == "" {
-			return nil, errors.New(
-				"schedule tidak punya form_template_id (cek schedule_plans)",
-			)
-		}
-
-		if schedule.InspectorID == nil {
-			return nil, errors.New("inspector belum ditentukan")
-		}
-
-		inspection = &domain.Inspection{
-			ID:             uuid.NewString(),
-			ScheduleID:     schedule.ID,
-			InspectorID:    *schedule.InspectorID,
-			FormTemplateID: schedule.FormTemplateID,
-			Status:         "draft",
-			CreatedAt:      time.Now(),
-		}
-
-		if err := uc.inspectionRepo.Create(inspection); err != nil {
-			return nil, err
-		}
-	}
-
-	// 5️⃣ Generate token
-	token := uuid.NewString()
-	exp := time.Now().Add(10 * time.Minute)
-
-	if err := uc.inspectionRepo.SetScanToken(
-		inspection.ID,
-		token,
-		exp,
-		req.NFCUID,
-	); err != nil {
+	// 2️⃣ Ambil schedule aktif
+	schedule, err := uc.scheduleRepo.GetActiveByAHU(ahu.ID)
+	if err != nil {
 		return nil, err
 	}
 
-	// 🔥 INI YANG HILANG SELAMA INI
+	if schedule == nil {
+		return nil, errors.New("tidak ada jadwal aktif untuk AHU ini")
+	}
+
+	// 3️⃣ Validasi inspector
+	if schedule.InspectorID == nil {
+		return nil, errors.New("schedule belum punya inspector")
+	}
+
+	if *schedule.InspectorID != inspectorID {
+		return nil, errors.New("schedule bukan milik anda")
+	}
+
+	// 4️⃣ Validasi status
+	if schedule.Status != domain.ScheduleStatusSiapDiperiksa {
+		return nil, errors.New("schedule sudah discan atau selesai")
+	}
+
+	// 5️⃣ Cek inspection existing
+	existing, err := uc.inspectionRepo.GetByScheduleID(schedule.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if existing != nil {
+		return nil, errors.New("inspection sudah dibuat")
+	}
+
+	// 6️⃣ Generate token
+	token := uuid.NewString()
+	exp := time.Now().Add(10 * time.Minute)
+
+	inspection := &domain.Inspection{
+		ID:             uuid.NewString(),
+		ScheduleID:     schedule.ID,
+		InspectorID:    inspectorID,
+		FormTemplateID: schedule.FormTemplateID,
+		Status:         domain.InspectionStatusSedangDiisi,
+
+		ScannedNFCUID: &req.NFCUID, // 🔥🔥🔥 INI YANG HILANG
+		InspectedAt: func() *time.Time {
+			t := time.Now()
+			return &t
+		}(),
+
+		ScanToken:        &token,
+		ScanTokenExpires: &exp,
+	}
+
+	// 7️⃣ Create inspection
+	if err := uc.inspectionRepo.Create(inspection); err != nil {
+		return nil, err
+	}
+
+	// 8️⃣ Update schedule → dalam_pemeriksaan
 	if err := uc.scheduleRepo.UpdateStatus(
 		schedule.ID,
 		domain.ScheduleStatusDalamPemeriksaan,

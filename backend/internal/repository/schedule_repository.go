@@ -13,5 +13,5 @@ type ScheduleRepository interface {
 	AssignInspector(scheduleID, inspectorID string) error
 	ListAll() ([]domain.Schedule, error)
 	ListWithDetail() ([]*domain.ScheduleWithDetail, error)
-	GetActiveByAHUAndInspector(ahuID string, inspectorID string) (*domain.Schedule, error)
+	GetActiveByAHU(ahuID string) (*domain.Schedule, error)
 }
