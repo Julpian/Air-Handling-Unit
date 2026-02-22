@@ -14,4 +14,6 @@ type ScheduleRepository interface {
 	ListAll() ([]domain.Schedule, error)
 	ListWithDetail() ([]*domain.ScheduleWithDetail, error)
 	GetActiveByAHU(ahuID string) (*domain.Schedule, error)
+	GetByYear(year int) ([]domain.Schedule, error)
+	ListWithDetailByYear(year int) ([]*domain.ScheduleWithDetail, error)
 }

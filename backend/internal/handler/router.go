@@ -21,6 +21,7 @@ func RegisterRoutes(
 
 	// ================= PUBLIC =================
 	api.POST("/auth/login", handlers.Login)
+	api.GET("/public/verify/:token", scheduleHandler.Verify)
 
 	// ================= AUTHENTICATED =================
 	secured := api.Group("")
@@ -51,6 +52,8 @@ func RegisterRoutes(
 		{
 			asmen.POST("/inspection/:id/approve", handlers.ApproveInspection)
 			asmen.POST("/inspection/:id/reject", handlers.RejectInspection)
+			asmen.POST("/schedule/:year/sign", handlers.AsmenSignSchedule)
+			asmen.GET("/schedule/:year", handlers.GetScheduleApproval)
 		}
 
 		secured.GET("/profile", handlers.GetMyProfile)
@@ -123,6 +126,10 @@ func RegisterRoutes(
 			// ================= AUDIT =================
 			admin.GET("/audit-trails", handlers.ListAuditTrails)
 			admin.GET("/audit-trails/:entity/:id", handlers.ListAuditByEntity)
+			admin.POST("/schedule/:year/sign", handlers.SVPSignSchedule)
+			admin.GET("/schedule/:year", handlers.GetScheduleApproval)
+			admin.GET("/schedule/:year/pdf", handlers.DownloadSchedulePDF)
+			admin.GET("/public/verify/:token", handlers.VerifySchedule)
 		}
 	}
 }

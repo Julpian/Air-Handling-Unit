@@ -14,6 +14,7 @@ type Handlers struct {
 
 	InspectionUC         *usecase.InspectionUsecase
 	InspectionApprovalUC *usecase.InspectionApprovalUsecase
+	ScheduleApprovalUC   *usecase.ScheduleApprovalUsecase
 
 	SchedulePlanUC   *usecase.SchedulePlanUsecase
 	GenerateUC       *usecase.GenerateScheduleUsecase
@@ -41,6 +42,7 @@ func NewHandlers(
 	generateUC *usecase.GenerateScheduleUsecase,
 	inspectionUC *usecase.InspectionUsecase,
 	inspectionApprovalUC *usecase.InspectionApprovalUsecase,
+	scheduleApprovalUC *usecase.ScheduleApprovalUsecase,
 	auditUC *usecase.AuditTrailUsecase,
 	ahuUC *usecase.AHUUsecase,
 
@@ -55,12 +57,14 @@ func NewHandlers(
 	formRepo repository.FormRepository,
 ) *Handlers {
 	return &Handlers{
-		AuthUC:           authUC,
-		UserManagementUC: userManagementUC,
-		SchedulePlanUC:   schedulePlanUC,
-		GenerateUC:       generateUC,
-		AuditUC:          auditUC,
-		AHUUC:            ahuUC,
+		AuthUC:               authUC,
+		UserManagementUC:     userManagementUC,
+		SchedulePlanUC:       schedulePlanUC,
+		GenerateUC:           generateUC,
+		AuditUC:              auditUC,
+		AHUUC:                ahuUC,
+		InspectionApprovalUC: inspectionApprovalUC,
+		ScheduleApprovalUC:   scheduleApprovalUC,
 
 		createFormTemplateUsecase:           createFormTemplateUC,
 		getFormTemplateDetailUsecase:        getFormTemplateDetailUC,

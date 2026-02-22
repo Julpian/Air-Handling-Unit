@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -9,20 +10,23 @@ import (
 )
 
 type ScheduleHandler struct {
-	bypassUC *usecase.ScheduleBypassNFCUsecase
-	assignUC *usecase.ScheduleAssignUsecase
-	queryUC  *usecase.ScheduleQueryUsecase
+	bypassUC   *usecase.ScheduleBypassNFCUsecase
+	assignUC   *usecase.ScheduleAssignUsecase
+	queryUC    *usecase.ScheduleQueryUsecase
+	approvalUC *usecase.ScheduleApprovalUsecase
 }
 
 func NewScheduleHandler(
 	bypassUC *usecase.ScheduleBypassNFCUsecase,
 	assignUC *usecase.ScheduleAssignUsecase,
-	queryUC *usecase.ScheduleQueryUsecase, // ⬅️ TAMBAH
+	queryUC *usecase.ScheduleQueryUsecase,
+	approvalUC *usecase.ScheduleApprovalUsecase, // ✅ TAMBAH
 ) *ScheduleHandler {
 	return &ScheduleHandler{
-		bypassUC: bypassUC,
-		assignUC: assignUC,
-		queryUC:  queryUC, // ⬅️ TAMBAH
+		bypassUC:   bypassUC,
+		assignUC:   assignUC,
+		queryUC:    queryUC,
+		approvalUC: approvalUC, // ✅ TAMBAH
 	}
 }
 
@@ -59,6 +63,16 @@ type assignInspectorRequest struct {
 }
 
 func (h *ScheduleHandler) AssignInspector(c *gin.Context) {
+
+	year := time.Now().Year()
+
+	approval, _ := h.approvalUC.Get(year)
+
+	if approval != nil && approval.Status == "completed" {
+		c.JSON(400, gin.H{"error": "schedule locked"})
+		return
+	}
+
 	scheduleID := c.Param("id")
 
 	var req assignInspectorRequest
@@ -91,4 +105,25 @@ func (h *ScheduleHandler) List(c *gin.Context) {
 	}
 
 	c.JSON(200, data)
+}
+
+func (h *ScheduleHandler) Verify(c *gin.Context) {
+
+	token := c.Param("token")
+
+	approval, err := h.approvalUC.GetByToken(token)
+	if err != nil || approval == nil {
+		c.JSON(404, gin.H{
+			"valid":   false,
+			"message": "Dokumen tidak valid",
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"valid":    true,
+		"year":     approval.Year,
+		"status":   approval.Status,
+		"pdf_path": approval.PDFPath,
+	})
 }

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 
 	"ahu-backend/internal/domain"
 
@@ -276,6 +277,8 @@ func (r *SchedulePostgresRepository) UpdateStatus(
 	status string,
 ) error {
 
+	status = strings.TrimSpace(strings.ToLower(status))
+
 	_, err := r.db.Exec(
 		context.Background(),
 		`
@@ -300,13 +303,21 @@ func (r *SchedulePostgresRepository) GetActiveByAHU(
 		s.plan_id,
 		s.inspector_id,
 		s.status,
-		sp.form_template_id
+
+		COALESCE(sp.form_template_id, (
+			SELECT id FROM form_templates
+			WHERE is_active = true
+			LIMIT 1
+		)) AS form_template_id
+
 	FROM schedules s
 	JOIN schedule_plans sp ON sp.id = s.plan_id
+
 	WHERE s.ahu_id = $1
-	  AND s.inspector_id IS NOT NULL   -- 🔥 FIX
+	  AND s.inspector_id IS NOT NULL
 	  AND s.status = 'siap_diperiksa'
 	  AND CURRENT_DATE BETWEEN s.start_date AND s.end_date
+
 	ORDER BY s.created_at DESC
 	LIMIT 1
 	`
@@ -326,4 +337,127 @@ func (r *SchedulePostgresRepository) GetActiveByAHU(
 	}
 
 	return &s, err
+}
+
+func (r *SchedulePostgresRepository) GetByYear(year int) ([]domain.Schedule, error) {
+
+	query := `
+	SELECT
+		s.id,
+		s.plan_id,
+		s.ahu_id,
+		s.start_date,
+		s.end_date,
+		s.inspector_id,
+		s.status,
+		s.nfc_bypass,
+		s.created_at
+	FROM schedules s
+	WHERE EXTRACT(YEAR FROM s.start_date) = $1
+	ORDER BY s.start_date ASC
+	`
+
+	rows, err := r.db.Query(context.Background(), query, year)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []domain.Schedule
+
+	for rows.Next() {
+		var s domain.Schedule
+
+		if err := rows.Scan(
+			&s.ID,
+			&s.PlanID,
+			&s.AHUId,
+			&s.StartDate,
+			&s.EndDate,
+			&s.InspectorID,
+			&s.Status,
+			&s.NFCBypass,
+			&s.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		result = append(result, s)
+	}
+
+	return result, nil
+}
+
+func (r *SchedulePostgresRepository) ListWithDetailByYear(year int) ([]*domain.ScheduleWithDetail, error) {
+
+	query := `
+	SELECT
+	s.id,
+	s.start_date,
+	s.end_date,
+	s.status,
+	s.nfc_bypass,
+
+	sp.id AS plan_id,
+	sp.period,
+	sp.week_of_month,
+	sp.month,
+
+	a.id AS ahu_id,
+	a.unit_code,
+	a.room_name,
+	a.nfc_uid,
+
+	s.inspector_id,
+	u.name AS inspector_name
+
+	FROM schedules s
+	JOIN schedule_plans sp ON sp.id = s.plan_id
+	JOIN ahus a ON a.id = s.ahu_id
+	JOIN users u ON u.id = s.inspector_id   -- 🔥 WAJIB ADA INSPECTOR
+
+	WHERE EXTRACT(YEAR FROM s.start_date) = $1
+	AND s.inspector_id IS NOT NULL        -- 🔥 FILTER FINAL
+
+	ORDER BY s.start_date ASC
+	`
+
+	rows, err := r.db.Query(context.Background(), query, year)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*domain.ScheduleWithDetail
+
+	for rows.Next() {
+		var d domain.ScheduleWithDetail
+
+		if err := rows.Scan(
+			&d.ID,
+			&d.StartDate,
+			&d.EndDate,
+			&d.Status,
+			&d.NFCBypass,
+
+			&d.PlanID,
+			&d.Period,
+			&d.WeekOfMonth,
+			&d.Month,
+
+			&d.AHUID,
+			&d.UnitCode,
+			&d.RoomName,
+			&d.NFCUID,
+
+			&d.InspectorID,
+			&d.InspectorName,
+		); err != nil {
+			return nil, err
+		}
+
+		result = append(result, &d)
+	}
+
+	return result, nil
 }

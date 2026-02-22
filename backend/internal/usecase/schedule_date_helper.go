@@ -15,8 +15,8 @@ func weekRangeOfMonth(
 
 	t := time.Date(year, month, 1, 0, 0, 0, 0, time.Local)
 
-	// Geser ke Minggu pertama
-	for t.Weekday() != time.Sunday {
+	// 🔥 Geser ke Senin pertama
+	for t.Weekday() != time.Monday {
 		t = t.AddDate(0, 0, 1)
 	}
 

@@ -39,6 +39,8 @@ func main() {
 	scheduleRepo := postgres.NewSchedulePostgresRepository(db)
 	inspectionRepo := postgres.NewInspectionPostgresRepository(db)
 	auditRepo := postgres.NewAuditTrailPostgresRepository(db)
+	scheduleApprovalRepo := postgres.NewScheduleApprovalPostgres(db)
+	pdfService := usecase.NewSchedulePDFService(scheduleRepo)
 	userRepo := postgres.NewUserPostgresRepository(db)
 	scheduleQueryUC := usecase.NewScheduleQueryUsecase(scheduleRepo)
 	ahuUC := usecase.NewAHUUsecase(ahuRepo)
@@ -112,6 +114,11 @@ func main() {
 		scanNFCUsecase,
 	)
 
+	scheduleApprovalUC := usecase.NewScheduleApprovalUsecase(
+		scheduleApprovalRepo,
+		pdfService,
+	)
+
 	inspectionApprovalUC := usecase.NewInspectionApprovalUsecase(
 		inspectionRepo,
 		scheduleRepo,
@@ -128,6 +135,7 @@ func main() {
 		generateScheduleUC,
 		inspectionUC,
 		inspectionApprovalUC,
+		scheduleApprovalUC,
 		auditUC,
 		ahuUC,
 		createFormTemplateUC,
@@ -150,6 +158,7 @@ func main() {
 		bypassUC,
 		assignScheduleUC,
 		scheduleQueryUC,
+		scheduleApprovalUC, // ✅ TAMBAH
 	)
 
 	inspectionFormHandler := handler.NewInspectionFormHandler(
@@ -168,7 +177,7 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			"http://localhost:3000",
-			"http://10.9.119.76:3000", // HP / LAN
+			"http://192.168.0.127:3000", // HP / LAN
 		},
 		AllowMethods: []string{
 			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
