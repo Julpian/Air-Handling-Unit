@@ -1,13 +1,33 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"ahu-backend/internal/usecase"
 )
+
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
 
 type ScheduleHandler struct {
 	bypassUC   *usecase.ScheduleBypassNFCUsecase
@@ -113,17 +133,46 @@ func (h *ScheduleHandler) Verify(c *gin.Context) {
 
 	approval, err := h.approvalUC.GetByToken(token)
 	if err != nil || approval == nil {
-		c.JSON(404, gin.H{
-			"valid":   false,
-			"message": "Dokumen tidak valid",
-		})
+		c.String(404, "Dokumen tidak valid")
 		return
 	}
 
-	c.JSON(200, gin.H{
-		"valid":    true,
-		"year":     approval.Year,
-		"status":   approval.Status,
-		"pdf_path": approval.PDFPath,
+	// pastikan PDFPath & PDFHash ada
+	if approval.PDFPath == nil || approval.PDFHash == nil {
+		c.String(500, "Hash PDF belum tersedia")
+		return
+	}
+
+	// ===== HITUNG ULANG HASH PDF =====
+	pdfHash, err := hashFile(*approval.PDFPath)
+	if err != nil {
+		c.String(500, "Gagal membaca PDF")
+		return
+	}
+
+	validIntegrity := pdfHash == *approval.PDFHash
+
+	c.HTML(200, "verify.html", gin.H{
+		"year":       approval.Year,
+		"svp":        approval.SVPID,
+		"asmen":      approval.AsmenID,
+		"svp_time":   approval.SVPSignedAt,
+		"asmen_time": approval.AsmenSignedAt,
+		"pdf":        *approval.PDFPath,
+
+		"integrity": validIntegrity,
+		"hash":      pdfHash,
 	})
+}
+
+func (h *ScheduleHandler) ListByYear(c *gin.Context) {
+	year, _ := strconv.Atoi(c.Param("year"))
+
+	data, err := h.queryUC.ListByYear(year)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, data)
 }

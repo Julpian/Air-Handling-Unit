@@ -3,28 +3,28 @@ package handler
 import (
 	"strconv"
 
-	"ahu-backend/internal/middleware"
-
 	"github.com/gin-gonic/gin"
 )
 
 func (h *Handlers) SVPSignSchedule(c *gin.Context) {
-	year, _ := strconv.Atoi(c.Param("year"))
-	user := middleware.GetUser(c)
 
-	var body struct {
+	year, _ := strconv.Atoi(c.Param("year"))
+	userID := c.GetString("user_id")
+
+	var req struct {
 		Signature string `json:"signature"`
 	}
 
-	c.BindJSON(&body)
+	c.ShouldBindJSON(&req)
 
-	err := h.ScheduleApprovalUC.SignSVP(year, user.ID, body.Signature)
+	err := h.ScheduleApprovalUC.SignSVP(year, userID, req.Signature)
+
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(200, gin.H{"status": "signed"})
+	c.JSON(200, gin.H{"message": "SVP signed"})
 }
 
 func (h *Handlers) AsmenSignSchedule(c *gin.Context) {

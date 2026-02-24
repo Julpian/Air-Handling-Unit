@@ -106,6 +106,7 @@ func main() {
 		ahuRepo,
 		scheduleRepo,
 		inspectionRepo,
+		formRepo,
 	)
 
 	inspectionHandler := handler.NewInspectionHandler(
@@ -172,12 +173,14 @@ func main() {
 	// 🔥 STATIC & LIMIT
 	r.MaxMultipartMemory = 8 << 20
 	r.Static("/uploads", "./uploads")
+	r.Static("/files", "./files")
+	r.LoadHTMLGlob("templates/*")
 
 	// 🔥 PASANG CORS DI SINI
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			"http://localhost:3000",
-			"http://192.168.0.127:3000", // HP / LAN
+			"http://10.9.118.16:3000", // HP / LAN
 		},
 		AllowMethods: []string{
 			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",

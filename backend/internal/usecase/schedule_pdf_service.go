@@ -3,16 +3,18 @@ package usecase
 import (
 	"ahu-backend/internal/domain"
 	"ahu-backend/internal/repository"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/skip2/go-qrcode"
-
 	"github.com/jung-kurt/gofpdf"
+	"github.com/skip2/go-qrcode"
 )
 
 type SchedulePDFService struct {
@@ -23,30 +25,23 @@ func NewSchedulePDFService(repo repository.ScheduleRepository) *SchedulePDFServi
 	return &SchedulePDFService{scheduleRepo: repo}
 }
 
-// Warna Material Design
+// Warna Professional & Clinical
 var (
-	colorBlue   = []int{30, 136, 229}  // Siap Diperiksa [cite: 3]
-	colorOrange = []int{255, 179, 0}   // Dalam Pemeriksaan [cite: 4]
-	colorGreen  = []int{67, 160, 71}   // Selesai [cite: 5]
-	colorGray   = []int{235, 235, 235} // Weekend
-	colorText   = []int{33, 33, 33}    // Text Utama
+	clrPrimary   = []int{15, 23, 42}    // Slate 900
+	clrSecondary = []int{100, 116, 139} // Slate 500
+
+	clrBlue  = []int{219, 234, 254} // Background Siap Diperiksa
+	clrBlueT = []int{30, 64, 175}   // Text Siap Diperiksa
+
+	clrAmber  = []int{254, 243, 199} // Background Dalam Pemeriksaan
+	clrAmberT = []int{146, 64, 14}   // Text Dalam Pemeriksaan
+
+	clrGreen  = []int{220, 252, 231} // Background Selesai
+	clrGreenT = []int{22, 101, 52}   // Text Selesai
+
+	clrWeekend = []int{248, 250, 252}
+	clrBorder  = []int{226, 232, 240}
 )
-
-func saveBase64Image(data string, filename string) (string, error) {
-	b, err := base64.StdEncoding.DecodeString(
-		strings.TrimPrefix(data, "data:image/png;base64,"),
-	)
-	if err != nil {
-		return "", err
-	}
-
-	path := "files/" + filename
-	return path, os.WriteFile(path, b, 0644)
-}
-
-func generateQR(url string, filename string) error {
-	return qrcode.WriteFile(url, qrcode.Medium, 180, filename)
-}
 
 func (s *SchedulePDFService) Generate(year int, approval *domain.ScheduleApproval, path string) error {
 	schedules, err := s.scheduleRepo.ListWithDetailByYear(year)
@@ -62,57 +57,50 @@ func (s *SchedulePDFService) Generate(year int, approval *domain.ScheduleApprova
 		}
 	}
 
-	// Setup PDF A3 Landscape (420 x 297 mm)
-	pdf := gofpdf.New("L", "mm", "A3", "")
-	pdf.SetMargins(15, 10, 15)
+	pdf := gofpdf.New("L", "mm", "A3", "") // 420 x 297 mm
+	pdf.SetMargins(20, 15, 20)
 	pdf.SetAutoPageBreak(false, 0)
 	pdf.AddPage()
 
-	// 1. HEADER & TITLE
-	pdf.SetTextColor(colorText[0], colorText[1], colorText[2])
-	pdf.SetFont("Arial", "B", 22)
-	pdf.CellFormat(0, 12, "KALENDER PENJADWALAN INSPEKSI AHU", "", 1, "C", false, 0, "") // [cite: 1]
-	pdf.SetFont("Arial", "", 16)
-	pdf.CellFormat(0, 8, fmt.Sprintf("Tahun %d", year), "", 1, "C", false, 0, "") // [cite: 2]
-
-	// 2. LEGEND
+	s.drawHeader(pdf, year)
 	s.drawLegend(pdf)
-	pdf.Ln(5)
+	pdf.Ln(8)
 
-	// 3. GRID 12 BULAN (3 Kolom x 4 Baris)
-	months := []string{"JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"} // [cite: 6, 7, 8, 119, 120, 121, 122, 123, 124, 125, 126, 127]
-	weekHeaders := []string{"Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"}                                                                      // [cite: 9, 10, 11, 12, 13, 14, 15]
-
-	pageW, _ := pdf.GetPageSize()
+	pageW, pageH := pdf.GetPageSize()
 	marginL, _, marginR, _ := pdf.GetMargins()
 	usableW := pageW - marginL - marginR
 
-	monthW := usableW / 3
-	monthH := 52.0 // DIKECILKAN agar tidak kepotong (52 * 4 baris = 208mm)
-	startX, startY := marginL, pdf.GetY()
+	// Penentuan tata letak agar tidak tertimpa
+	footerReservedH := 65.0
+	startYGrid := pdf.GetY()
+	availableGridH := pageH - startYGrid - footerReservedH
+
+	months := []string{"JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"}
+	weekHeaders := []string{"SEN", "SEL", "RAB", "KAM", "JUM", "SAB", "MIN"}
+
+	// Ukuran kotak bulan
+	monthW := (usableW / 3) - 6
+	monthH := (availableGridH / 4) - 4
 
 	for m := 1; m <= 12; m++ {
 		col := (m - 1) % 3
 		row := (m - 1) / 3
-		x0 := startX + (float64(col) * monthW)
-		y0 := startY + (float64(row) * monthH)
+		x0 := marginL + (float64(col) * (monthW + 9))
+		y0 := startYGrid + (float64(row) * (monthH + 5))
 
-		// Border luar bulan
-		pdf.SetDrawColor(180, 180, 180)
-		pdf.Rect(x0+2, y0, monthW-4, monthH-4, "D")
-
-		// Nama Bulan
-		pdf.SetXY(x0, y0+1)
-		pdf.SetFont("Arial", "B", 10)
-		pdf.CellFormat(monthW, 6, months[m-1], "", 1, "C", false, 0, "")
+		// Judul Bulan
+		pdf.SetXY(x0, y0)
+		pdf.SetFont("Arial", "B", 11)
+		pdf.SetTextColor(clrPrimary[0], clrPrimary[1], clrPrimary[2])
+		pdf.CellFormat(monthW, 7, months[m-1], "", 1, "L", false, 0, "")
 
 		// Header Hari
-		colW := (monthW - 10) / 7
+		colW := monthW / 7
 		pdf.SetFont("Arial", "B", 7)
-		pdf.SetFillColor(245, 245, 245)
-		pdf.SetXY(x0+5, y0+7)
+		pdf.SetTextColor(clrSecondary[0], clrSecondary[1], clrSecondary[2])
+		pdf.SetXY(x0, y0+7)
 		for _, h := range weekHeaders {
-			pdf.CellFormat(colW, 5, h, "1", 0, "C", true, 0, "")
+			pdf.CellFormat(colW, 5, h, "B", 0, "C", false, 0, "")
 		}
 
 		// Kalender Logic
@@ -120,13 +108,13 @@ func (s *SchedulePDFService) Generate(year int, approval *domain.ScheduleApprova
 		startW := int(first.Weekday())
 		if startW == 0 {
 			startW = 7
-		} // Sun=0 ke 7
+		}
 		offset := startW - 1
 		daysInMonth := time.Date(year, time.Month(m)+1, 0, 0, 0, 0, 0, time.Local).Day()
 
-		cellH := (monthH - 18) / 6
+		cellH := (monthH - 12) / 6
 		for r := 0; r < 6; r++ {
-			pdf.SetXY(x0+5, y0+12+(float64(r)*cellH))
+			pdf.SetXY(x0, y0+12+(float64(r)*cellH))
 			for c := 0; c < 7; c++ {
 				dayIdx := r*7 + c - offset + 1
 				currX, currY := pdf.GetX(), pdf.GetY()
@@ -134,126 +122,165 @@ func (s *SchedulePDFService) Generate(year int, approval *domain.ScheduleApprova
 				if dayIdx > 0 && dayIdx <= daysInMonth {
 					key := time.Date(year, time.Month(m), dayIdx, 0, 0, 0, 0, time.Local).Format("2006-01-02")
 
-					// Warna latar belakang berdasarkan status
 					if statuses, ok := calendar[key]; ok && len(statuses) > 0 {
-						s.setStatusFillColor(pdf, statuses[0]) // Pakai status pertama
-						pdf.Rect(currX, currY, colW, cellH, "F")
-						pdf.SetTextColor(255, 255, 255) // Text putih jika berwarna
+						s.setStatusColors(pdf, statuses[0])
+						pdf.Rect(currX+0.3, currY+0.3, colW-0.6, cellH-0.6, "F")
 					} else if c >= 5 {
-						pdf.SetFillColor(colorGray[0], colorGray[1], colorGray[2])
-						pdf.Rect(currX, currY, colW, cellH, "F")
-						pdf.SetTextColor(colorText[0], colorText[1], colorText[2])
+						pdf.SetFillColor(clrWeekend[0], clrWeekend[1], clrWeekend[2])
+						pdf.Rect(currX+0.3, currY+0.3, colW-0.6, cellH-0.6, "F")
+						pdf.SetTextColor(clrSecondary[0], clrSecondary[1], clrSecondary[2])
 					} else {
-						pdf.SetTextColor(colorText[0], colorText[1], colorText[2])
+						pdf.SetTextColor(clrPrimary[0], clrPrimary[1], clrPrimary[2])
 					}
 
-					pdf.Rect(currX, currY, colW, cellH, "D")
 					pdf.SetFont("Arial", "B", 8)
-					pdf.Text(currX+1.5, currY+4, strconv.Itoa(dayIdx))
-				} else {
-					pdf.SetDrawColor(220, 220, 220)
-					pdf.Rect(currX, currY, colW, cellH, "D")
+					pdf.Text(currX+1, currY+3.5, strconv.Itoa(dayIdx))
 				}
 				pdf.SetXY(currX+colW, currY)
 			}
 		}
 	}
 
-	// 4. SIGNATURE AREA
-	s.drawSignatureArea(pdf, approval)
+	// Signature Area diletakkan di koordinat absolut bawah
+	s.drawSignatureArea(pdf, approval, year, pageH-45)
+	s.drawFooter(pdf)
 
-	return pdf.OutputFileAndClose(path)
+	if err := pdf.OutputFileAndClose(path); err != nil {
+		return err
+	}
+
+	hash, _ := hashFile(path)
+	_ = s.scheduleRepo.SetPDFHash(year, hash)
+	return nil
 }
 
-func (s *SchedulePDFService) setStatusFillColor(pdf *gofpdf.Fpdf, status string) {
+func (s *SchedulePDFService) drawHeader(pdf *gofpdf.Fpdf, year int) {
+	pdf.SetTextColor(clrPrimary[0], clrPrimary[1], clrPrimary[2])
+	pdf.SetFont("Arial", "B", 24)
+	pdf.CellFormat(0, 15, "JADWAL INSPEKSI TAHUNAN AHU SYSTEM", "", 1, "L", false, 0, "")
+
+	pdf.SetFont("Arial", "", 12)
+	pdf.SetTextColor(clrSecondary[0], clrSecondary[1], clrSecondary[2])
+	pdf.CellFormat(0, 5, fmt.Sprintf("Periode Tahun Penjadwalan %d Dokumen Resmi AIRA System", year), "", 1, "L", false, 0, "")
+	pdf.Ln(8)
+}
+
+func (s *SchedulePDFService) setStatusColors(pdf *gofpdf.Fpdf, status string) {
 	switch status {
 	case "siap_diperiksa":
-		pdf.SetFillColor(colorBlue[0], colorBlue[1], colorBlue[2])
+		pdf.SetFillColor(clrBlue[0], clrBlue[1], clrBlue[2])
+		pdf.SetTextColor(clrBlueT[0], clrBlueT[1], clrBlueT[2])
 	case "dalam_pemeriksaan":
-		pdf.SetFillColor(colorOrange[0], colorOrange[1], colorOrange[2])
+		pdf.SetFillColor(clrAmber[0], clrAmber[1], clrAmber[2])
+		pdf.SetTextColor(clrAmberT[0], clrAmberT[1], clrAmberT[2])
 	case "selesai":
-		pdf.SetFillColor(colorGreen[0], colorGreen[1], colorGreen[2])
-	default:
-		pdf.SetFillColor(200, 200, 200)
+		pdf.SetFillColor(clrGreen[0], clrGreen[1], clrGreen[2])
+		pdf.SetTextColor(clrGreenT[0], clrGreenT[1], clrGreenT[2])
 	}
 }
 
 func (s *SchedulePDFService) drawLegend(pdf *gofpdf.Fpdf) {
-	pdf.SetFont("Arial", "", 9)
+	pdf.SetFont("Arial", "B", 8)
+	pdf.SetTextColor(clrSecondary[0], clrSecondary[1], clrSecondary[2])
+	pdf.Text(20, pdf.GetY()+4, "KETERANGAN STATUS:")
+
 	legends := []struct {
 		label string
-		rgb   []int
+		bg    []int
+		txt   []int
 	}{
-		{"Siap Diperiksa", colorBlue},
-		{"Dalam Pemeriksaan", colorOrange},
-		{"Selesai", colorGreen},
+		{"SIAP DIPERIKSA", clrBlue, clrBlueT},
+		{"DALAM PEMERIKSAAN", clrAmber, clrAmberT},
+		{"SELESAI", clrGreen, clrGreenT},
 	}
-	x := 150.0
+
+	x := 55.0
+	y := pdf.GetY()
 	for _, l := range legends {
-		pdf.SetFillColor(l.rgb[0], l.rgb[1], l.rgb[2])
-		pdf.Rect(x, pdf.GetY()+1, 4, 4, "F")
-		pdf.SetXY(x+5, pdf.GetY())
-		pdf.Cell(40, 6, l.label)
-		x += 45
+		pdf.SetFillColor(l.bg[0], l.bg[1], l.bg[2])
+		pdf.Rect(x, y+1, 30, 5, "F")
+		pdf.SetTextColor(l.txt[0], l.txt[1], l.txt[2])
+		pdf.SetXY(x, y+1)
+		pdf.CellFormat(30, 5, l.label, "", 0, "C", false, 0, "")
+		x += 35
 	}
 }
 
-func (s *SchedulePDFService) drawSignatureArea(
-	pdf *gofpdf.Fpdf,
-	approval *domain.ScheduleApproval,
-) {
+func (s *SchedulePDFService) drawSignatureArea(pdf *gofpdf.Fpdf, approval *domain.ScheduleApproval, year int, yBase float64) {
+	pdf.SetDrawColor(clrBorder[0], clrBorder[1], clrBorder[2])
+	pdf.Line(20, yBase-5, 400, yBase-5)
 
-	if approval == nil || approval.VerifyToken == nil || *approval.VerifyToken == "" {
-		return
-	}
-	// Geser y sedikit ke atas (252) agar nama di bawah kotak tidak terpotong
-	// di batas bawah kertas A3 (297mm)
-	y := 252.0
+	if approval != nil && approval.VerifyToken != nil {
+		verifyURL := fmt.Sprintf("http://10.9.118.16:8080/api/public/verify/%s", *approval.VerifyToken)
+		qrPath := fmt.Sprintf("files/verify_%d.png", year)
+		_ = generateQR(verifyURL, qrPath)
 
-	pdf.SetTextColor(colorText[0], colorText[1], colorText[2])
-	pdf.SetFont("Arial", "B", 11)
-	pdf.Text(300, y, "Disetujui,") // [cite: 18]
-
-	// --- BAGIAN SVP ---
-	pdf.SetFont("Arial", "B", 10)
-	pdf.Text(300, y+5, "SVP") // [cite: 20]
-
-	// Kotak Tanda Tangan
-	pdf.SetDrawColor(180, 180, 180)
-	pdf.Rect(300, y+7, 45, 20, "D")
-
-	// Nama di bawah kotak
-	pdf.Text(300, y+31, "Asep")
-
-	if approval.SVPSignature != nil {
-		path, _ := saveBase64Image(*approval.SVPSignature, "svp.png")
-		// PERBAIKAN: Gunakan tinggi (height) 16mm sebagai batasan agar pas di kotak 20mm
-		// Lebar (width) diatur 0 agar skala gambar tetap proporsional
-		pdf.ImageOptions(path, 302, y+9, 0, 16, false, gofpdf.ImageOptions{ReadDpi: true}, 0, "")
+		pdf.Image(qrPath, 20, yBase, 30, 30, false, "", 0, "")
+		pdf.SetXY(52, yBase+8)
+		pdf.SetFont("Arial", "B", 8)
+		pdf.SetTextColor(clrPrimary[0], clrPrimary[1], clrPrimary[2])
+		pdf.Cell(0, 4, "DIGITAL VERIFICATION SYSTEM")
+		pdf.SetXY(52, yBase+12)
+		pdf.SetFont("Arial", "", 7)
+		pdf.SetTextColor(clrSecondary[0], clrSecondary[1], clrSecondary[2])
+		pdf.MultiCell(70, 3, "Dokumen ini sah dan terverifikasi secara digital. Pindai kode QR untuk melihat riwayat approval asli pada server AIRA.", "", "L", false)
 	}
 
-	// --- BAGIAN ASMEN ---
-	pdf.Text(355, y+5, "ASMEN") // [cite: 21]
+	s.drawSignBox(pdf, 290, yBase, "Senior Vice President", "Asep", approval.SVPSignature)
+	s.drawSignBox(pdf, 350, yBase, "Assistant Manager", "Hermawan", approval.AsmenSignature)
+}
 
-	// Kotak Tanda Tangan
-	pdf.Rect(355, y+7, 45, 20, "D")
+func (s *SchedulePDFService) drawSignBox(pdf *gofpdf.Fpdf, x, y float64, role, name string, sig *string) {
+	pdf.SetTextColor(clrPrimary[0], clrPrimary[1], clrPrimary[2])
+	pdf.SetFont("Arial", "B", 8)
+	pdf.Text(x, y+4, strings.ToUpper(role))
 
-	// Nama di bawah kotak
-	pdf.Text(355, y+31, "Hermawan")
+	pdf.SetDrawColor(245, 245, 245)
+	pdf.Rect(x, y+6, 50, 22, "D")
 
-	if approval.AsmenSignature != nil {
-		path, _ := saveBase64Image(*approval.AsmenSignature, "asmen.png")
-		// PERBAIKAN: Batasi tinggi gambar 16mm agar tidak meluber keluar kotak
-		pdf.ImageOptions(path, 357, y+9, 0, 16, false, gofpdf.ImageOptions{ReadDpi: true}, 0, "")
+	if sig != nil && *sig != "" {
+		path, _ := saveBase64Image(*sig, fmt.Sprintf("%s.png", name))
+		pdf.ImageOptions(path, x+5, y+8, 0, 18, false, gofpdf.ImageOptions{ReadDpi: true}, 0, "")
 	}
 
-	verifyURL := fmt.Sprintf(
-		"http://192.168.0.127:8080/api/public/verify/%s",
-		*approval.VerifyToken,
+	pdf.SetFont("Arial", "B", 9)
+	pdf.Text(x, y+34, name)
+	pdf.SetDrawColor(clrPrimary[0], clrPrimary[1], clrPrimary[2])
+	pdf.Line(x, y+35, x+50, y+35)
+}
+
+func (s *SchedulePDFService) drawFooter(pdf *gofpdf.Fpdf) {
+	pdf.SetXY(20, 285)
+	pdf.SetFont("Arial", "I", 8)
+	pdf.SetTextColor(clrSecondary[0], clrSecondary[1], clrSecondary[2])
+	now := time.Now().Format("02/01/2006 15:04:05")
+	pdf.CellFormat(0, 10, fmt.Sprintf("Dicetak otomatis oleh AIRA System pada %s Halaman 1 dari 1", now), "", 0, "L", false, 0, "")
+}
+
+func saveBase64Image(data string, filename string) (string, error) {
+	b, err := base64.StdEncoding.DecodeString(
+		strings.TrimPrefix(data, "data:image/png;base64,"),
 	)
+	if err != nil {
+		return "", err
+	}
+	path := "files/" + filename
+	return path, os.WriteFile(path, b, 0644)
+}
 
-	qrPath := "files/verify.png"
-	_ = generateQR(verifyURL, qrPath)
+func generateQR(url string, filename string) error {
+	return qrcode.WriteFile(url, qrcode.Medium, 180, filename)
+}
 
-	pdf.Image(qrPath, 250, y+5, 30, 0, false, "", 0, "")
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }

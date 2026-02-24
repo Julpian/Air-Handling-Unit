@@ -461,3 +461,57 @@ func (r *SchedulePostgresRepository) ListWithDetailByYear(year int) ([]*domain.S
 
 	return result, nil
 }
+
+func (r *SchedulePostgresRepository) SetPDFHash(year int, hash string) error {
+	_, err := r.db.Exec(context.Background(), `
+        UPDATE schedule_approvals
+        SET pdf_hash=$1
+        WHERE year=$2
+    `, hash, year)
+
+	return err
+}
+
+func (r *SchedulePostgresRepository) ListByYear(year int) ([]*domain.ScheduleWithDetail, error) {
+
+	rows, err := r.db.Query(context.Background(), `
+		SELECT
+			s.id,
+			s.start_date,
+			s.end_date,
+
+			a.unit_code,
+			u.name
+
+		FROM schedules s
+		JOIN ahus a ON a.id = s.ahu_id
+		LEFT JOIN users u ON u.id = s.inspector_id
+
+		WHERE EXTRACT(YEAR FROM s.start_date) = $1
+		ORDER BY s.start_date
+	`, year)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var result []*domain.ScheduleWithDetail
+
+	for rows.Next() {
+		var d domain.ScheduleWithDetail
+
+		rows.Scan(
+			&d.ID,
+			&d.StartDate,
+			&d.EndDate,
+			&d.UnitCode,
+			&d.InspectorName,
+		)
+
+		result = append(result, &d)
+	}
+
+	return result, nil
+}

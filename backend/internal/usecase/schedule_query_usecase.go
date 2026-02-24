@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"ahu-backend/internal/domain"
 	"ahu-backend/internal/repository"
 	"ahu-backend/internal/usecase/dto"
 )
@@ -46,4 +47,8 @@ func (u *ScheduleQueryUsecase) List() ([]*dto.ScheduleListDTO, error) {
 	}
 
 	return result, nil
+}
+
+func (u *ScheduleQueryUsecase) ListByYear(year int) ([]*domain.ScheduleWithDetail, error) {
+	return u.repo.ListByYear(year)
 }

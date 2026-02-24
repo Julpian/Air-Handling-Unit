@@ -15,17 +15,20 @@ type ScanNFCUsecase struct {
 	ahuRepo        repository.AHURepository
 	scheduleRepo   repository.ScheduleRepository
 	inspectionRepo repository.InspectionRepository
+	formRepo       repository.FormRepository // ✅ TAMBAH
 }
 
 func NewScanNFCUsecase(
 	ahuRepo repository.AHURepository,
 	scheduleRepo repository.ScheduleRepository,
 	inspectionRepo repository.InspectionRepository,
+	formRepo repository.FormRepository, // ✅ TAMBAH
 ) *ScanNFCUsecase {
 	return &ScanNFCUsecase{
 		ahuRepo:        ahuRepo,
 		scheduleRepo:   scheduleRepo,
 		inspectionRepo: inspectionRepo,
+		formRepo:       formRepo, // ✅ SIMPAN
 	}
 }
 
@@ -43,7 +46,6 @@ func (uc *ScanNFCUsecase) Execute(
 	if err != nil {
 		return nil, err
 	}
-
 	if ahu == nil {
 		return nil, errors.New("nfc tidak terdaftar")
 	}
@@ -53,7 +55,6 @@ func (uc *ScanNFCUsecase) Execute(
 	if err != nil {
 		return nil, err
 	}
-
 	if schedule == nil {
 		return nil, errors.New("tidak ada jadwal aktif untuk AHU ini")
 	}
@@ -62,7 +63,6 @@ func (uc *ScanNFCUsecase) Execute(
 	if schedule.InspectorID == nil {
 		return nil, errors.New("schedule belum punya inspector")
 	}
-
 	if *schedule.InspectorID != inspectorID {
 		return nil, errors.New("schedule bukan milik anda")
 	}
@@ -77,27 +77,37 @@ func (uc *ScanNFCUsecase) Execute(
 	if err != nil {
 		return nil, err
 	}
-
 	if existing != nil {
 		return nil, errors.New("inspection sudah dibuat")
+	}
+
+	// ===============================
+	// 🔥 AMBIL FORM BERDASARKAN PERIOD
+	// ===============================
+	form, err := uc.formRepo.GetTemplateBySchedule(schedule.ID)
+	if err != nil {
+		return nil, err
+	}
+	if form == nil {
+		return nil, errors.New("form template tidak ditemukan untuk schedule ini")
 	}
 
 	// 6️⃣ Generate token
 	token := uuid.NewString()
 	exp := time.Now().Add(10 * time.Minute)
 
+	now := time.Now()
+
 	inspection := &domain.Inspection{
 		ID:             uuid.NewString(),
 		ScheduleID:     schedule.ID,
 		InspectorID:    inspectorID,
-		FormTemplateID: schedule.FormTemplateID,
-		Status:         domain.InspectionStatusSedangDiisi,
+		FormTemplateID: form.ID, // ✅ FIX UTAMA
 
-		ScannedNFCUID: &req.NFCUID, // 🔥🔥🔥 INI YANG HILANG
-		InspectedAt: func() *time.Time {
-			t := time.Now()
-			return &t
-		}(),
+		Status: domain.InspectionStatusSedangDiisi,
+
+		ScannedNFCUID: &req.NFCUID,
+		InspectedAt:   &now,
 
 		ScanToken:        &token,
 		ScanTokenExpires: &exp,
@@ -108,7 +118,7 @@ func (uc *ScanNFCUsecase) Execute(
 		return nil, err
 	}
 
-	// 8️⃣ Update schedule → dalam_pemeriksaan
+	// 8️⃣ Update schedule → dalam pemeriksaan
 	if err := uc.scheduleRepo.UpdateStatus(
 		schedule.ID,
 		domain.ScheduleStatusDalamPemeriksaan,

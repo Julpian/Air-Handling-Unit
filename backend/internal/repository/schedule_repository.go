@@ -16,4 +16,6 @@ type ScheduleRepository interface {
 	GetActiveByAHU(ahuID string) (*domain.Schedule, error)
 	GetByYear(year int) ([]domain.Schedule, error)
 	ListWithDetailByYear(year int) ([]*domain.ScheduleWithDetail, error)
+	SetPDFHash(year int, hash string) error
+	ListByYear(year int) ([]*domain.ScheduleWithDetail, error)
 }

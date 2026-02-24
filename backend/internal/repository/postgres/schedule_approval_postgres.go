@@ -22,7 +22,7 @@ func (r *ScheduleApprovalPostgres) GetByYear(year int) (*domain.ScheduleApproval
 	row := r.db.QueryRow(context.Background(), `
 		SELECT id,year,svp_id,svp_signed_at,svp_signature,
 		       asmen_id,asmen_signed_at,asmen_signature,
-		       pdf_path,status,verify_token,created_at
+		       pdf_path,pdf_hash,status,verify_token,created_at
 		FROM schedule_approvals WHERE year=$1
 	`, year)
 
@@ -38,6 +38,7 @@ func (r *ScheduleApprovalPostgres) GetByYear(year int) (*domain.ScheduleApproval
 		&s.AsmenSignedAt,
 		&s.AsmenSignature,
 		&s.PDFPath,
+		&s.PDFHash,
 		&s.Status,
 		&s.VerifyToken,
 		&s.CreatedAt,
@@ -118,7 +119,7 @@ func (r *ScheduleApprovalPostgres) GetByToken(token string) (*domain.ScheduleApp
 	row := r.db.QueryRow(context.Background(), `
 		SELECT id,year,svp_id,svp_signed_at,svp_signature,
 		       asmen_id,asmen_signed_at,asmen_signature,
-		       pdf_path,status,verify_token,created_at
+		       pdf_path,pdf_hash,status,verify_token,created_at
 		FROM schedule_approvals
 		WHERE verify_token=$1
 	`, token)
@@ -135,6 +136,7 @@ func (r *ScheduleApprovalPostgres) GetByToken(token string) (*domain.ScheduleApp
 		&s.AsmenSignedAt,
 		&s.AsmenSignature,
 		&s.PDFPath,
+		&s.PDFHash, // 🔥 TAMBAH INI
 		&s.Status,
 		&s.VerifyToken,
 		&s.CreatedAt,

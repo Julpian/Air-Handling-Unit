@@ -15,6 +15,7 @@ type ScheduleApproval struct {
 	AsmenSignedAt  *time.Time
 
 	PDFPath *string
+	PDFHash *string
 
 	Status      string
 	VerifyToken *string `json:"verify_token"`

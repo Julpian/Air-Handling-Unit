@@ -50,10 +50,9 @@ func RegisterRoutes(
 		asmen := secured.Group("/asmen")
 		asmen.Use(middleware.RequireRole("asmen"))
 		{
-			asmen.POST("/inspection/:id/approve", handlers.ApproveInspection)
-			asmen.POST("/inspection/:id/reject", handlers.RejectInspection)
 			asmen.POST("/schedule/:year/sign", handlers.AsmenSignSchedule)
 			asmen.GET("/schedule/:year", handlers.GetScheduleApproval)
+			asmen.GET("/schedule/:year/preview", scheduleHandler.ListByYear)
 		}
 
 		secured.GET("/profile", handlers.GetMyProfile)
