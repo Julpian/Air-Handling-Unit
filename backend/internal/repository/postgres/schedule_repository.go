@@ -97,6 +97,7 @@ func (r *SchedulePostgresRepository) ListAll() ([]domain.Schedule, error) {
 			status,
 			nfc_bypass,
 			created_at
+			sp.period,          -- 🔥 Tambahkan ini
 		FROM schedules
 		ORDER BY start_date ASC
 	`
@@ -121,6 +122,7 @@ func (r *SchedulePostgresRepository) ListAll() ([]domain.Schedule, error) {
 			&s.Status,
 			&s.NFCBypass,
 			&s.CreatedAt,
+			&s.Period,
 		); err != nil {
 			return nil, err
 		}
@@ -511,6 +513,53 @@ func (r *SchedulePostgresRepository) ListByYear(year int) ([]*domain.ScheduleWit
 		)
 
 		result = append(result, &d)
+	}
+
+	return result, nil
+}
+
+func (r *SchedulePostgresRepository) ListTasksByInspector(
+	inspectorID string,
+) ([]domain.InspectionTask, error) {
+
+	rows, err := r.db.Query(context.Background(), `
+	SELECT
+		s.id,
+		s.start_date,
+		s.end_date,
+		s.status,
+		a.unit_code,
+		sp.period
+	FROM schedules s
+	JOIN ahus a ON a.id = s.ahu_id
+	JOIN schedule_plans sp ON sp.id = s.plan_id
+	WHERE s.inspector_id = $1
+	AND s.status IN ('siap_diperiksa','dalam_pemeriksaan')
+	ORDER BY s.start_date ASC
+	`, inspectorID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []domain.InspectionTask
+
+	for rows.Next() {
+		var t domain.InspectionTask
+		err := rows.Scan(
+			&t.ID,
+			&t.StartDate,
+			&t.EndDate,
+			&t.Status,
+			&t.UnitCode,
+			&t.Period,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, t)
 	}
 
 	return result, nil

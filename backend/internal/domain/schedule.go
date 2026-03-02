@@ -18,4 +18,7 @@ type Schedule struct {
 	CreatedAt   time.Time
 
 	FormTemplateID string
+
+	// 🔥 TAMBAHAN UNTUK TASK VIEW
+	UnitCode string
 }

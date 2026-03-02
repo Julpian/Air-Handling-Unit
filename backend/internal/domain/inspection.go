@@ -19,6 +19,11 @@ type Inspection struct {
 	ScannedNFCUID *string    // UID NFC yang discan
 	InspectedAt   *time.Time // waktu scan NFC dilakukan
 
+	InspectorSignature *string
+	SPVSignature       *string
+	SPVSignedAt        *time.Time
+	ApprovedBy         *string
+
 	ParentID  *string // jika re-inspection
 	CreatedAt time.Time
 }

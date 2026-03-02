@@ -16,19 +16,22 @@ type SubmitInspectionFormUsecase struct {
 	inspectRepo  repository.InspectionRepository
 	formRepo     repository.FormRepository
 	scheduleRepo repository.ScheduleRepository //
+	pdfService   *InspectionPDFService
 }
 
 func NewSubmitInspectionFormUsecase(
 	resultRepo repository.InspectionResultRepository,
 	inspectionRepo repository.InspectionRepository,
 	formRepo repository.FormRepository,
-	scheduleRepo repository.ScheduleRepository, // 🔥 TAMBAH
+	scheduleRepo repository.ScheduleRepository,
+	pdf *InspectionPDFService,
 ) *SubmitInspectionFormUsecase {
 	return &SubmitInspectionFormUsecase{
 		resultRepo:   resultRepo,
 		inspectRepo:  inspectionRepo,
 		formRepo:     formRepo,
 		scheduleRepo: scheduleRepo,
+		pdfService:   pdf,
 	}
 }
 
@@ -145,11 +148,15 @@ func (uc *SubmitInspectionFormUsecase) Execute(
 
 	uc.inspectRepo.ClearScanToken(inspectionID)
 
-	return uc.inspectRepo.UpdateStatus(
+	if err := uc.inspectRepo.UpdateStatus(
 		inspectionID,
 		status,
 		nil,
-	)
+	); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (uc *SubmitInspectionFormUsecase) GetInspection(id string) (*domain.Inspection, error) {

@@ -15,10 +15,18 @@ type InspectionRepository interface {
 	UpdateStatus(id string, status string, note *string) error
 
 	ExistsApproved(scheduleID string) (bool, error)
-	ListByStatus(status string) ([]domain.Inspection, error)
+	ListByStatus(status string, inspectorID string) ([]domain.Inspection, error)
 	SaveResult(result *domain.InspectionResult) error
 	ClearScanToken(id string) error
 	GetByScheduleID(scheduleID string) (*domain.Inspection, error)
+	GetInspectionReport(id string) (*domain.InspectionReport, error)
+	SignInspection(id string, signature string) error
+	SaveSignature(id string, signature string) error
+	ApproveInspection(
+		id string,
+		spvID string,
+		signature string,
+	) error
 
 	Approve(
 		inspectionID string,

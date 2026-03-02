@@ -50,6 +50,8 @@ func main() {
 	getFormTemplateDetailUC := usecase.NewGetFormTemplateDetailUsecase(formRepo)
 	listFormTemplateUC := usecase.NewListFormTemplateUsecase(formRepo)
 	setFormTemplateActiveUC := usecase.NewSetFormTemplateActiveUsecase(formRepo)
+	inspectionPDFService := usecase.NewInspectionPDFService(inspectionRepo)
+	inspectionTaskUC := usecase.NewInspectionTaskUsecase(scheduleRepo)
 	createNewFormTemplateVersionUC :=
 		usecase.NewCreateNewFormTemplateVersionUsecase(formRepo)
 	listFormTemplateVersionsUC :=
@@ -73,7 +75,9 @@ func main() {
 		schedulePlanRepo,
 		scheduleRepo,
 	)
-
+	approveInspectionUsecase := usecase.NewApproveInspectionUsecase(
+		inspectionRepo,
+	)
 	getFormUC := usecase.NewGetFormByInspectionUsecase(
 		inspectionRepo,
 		formRepo,
@@ -86,6 +90,7 @@ func main() {
 		inspectionRepo,
 		formRepo,
 		scheduleRepo, // 🔥 TAMBAH
+		inspectionPDFService,
 	)
 
 	authUC := usecase.NewAuthUsecase(userRepo)
@@ -109,10 +114,19 @@ func main() {
 		formRepo,
 	)
 
+	signUC := usecase.NewSignInspectionUsecase(
+		inspectionRepo,
+		inspectionPDFService,
+	)
+
 	inspectionHandler := handler.NewInspectionHandler(
 		inspectionUC,
 		inspectionQueryUC,
 		scanNFCUsecase,
+		inspectionTaskUC,
+		signUC,
+		approveInspectionUsecase, // 🔥 TAMBAH
+		inspectionPDFService,     // 🔥 TAMBAH
 	)
 
 	scheduleApprovalUC := usecase.NewScheduleApprovalUsecase(

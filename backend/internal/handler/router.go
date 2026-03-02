@@ -28,20 +28,31 @@ func RegisterRoutes(
 	secured.Use(middleware.AuthMiddleware())
 	{
 		// =================================================
-		// ================= INSPECTOR =====================
+		// ================= INSPECTION GROUP ==============
 		// =================================================
-		inspector := secured.Group("/inspection")
-		inspector.Use(middleware.RequireRole("inspector"))
+		// Jangan pasang RequireRole("inspector") di sini agar SPV & Admin bisa akses
+		inspection := secured.Group("/inspection")
 		{
-			inspector.GET("", inspectionHandler.List)
-			inspector.GET("/dashboard", inspectionHandler.Dashboard)
-			inspector.GET("/:inspection_id/detail", inspectionHandler.Detail)
+			// Route umum (bisa diakses SPV/Admin/Inspector)
+			inspection.GET("", inspectionHandler.List)
+			inspection.GET("/:inspection_id/detail", inspectionHandler.Detail)
 
-			// NFC SCAN (SATU SAJA)
-			inspector.POST("/scan-nfc", inspectionHandler.ScanNFC)
+			// 🔥 KHUSUS INSPECTOR
+			inspectorOnly := inspection.Group("")
+			inspectorOnly.Use(middleware.RequireRole("inspector"))
+			{
+				// Daftarkan kembali yang sempat hilang:
+				inspectorOnly.GET("/dashboard", inspectionHandler.Dashboard)
+				inspectorOnly.GET("/tasks", inspectionHandler.Tasks) // <--- INI KUNCINYA
 
-			inspector.POST("/:inspection_id/form/submit", inspectionFormHandler.Submit)
-			inspector.GET("/:inspection_id/form", inspectionFormHandler.GetForm)
+				inspectorOnly.POST("/scan-nfc", inspectionHandler.ScanNFC)
+				inspectorOnly.POST("/:inspection_id/form/submit", inspectionFormHandler.Submit)
+				inspectorOnly.GET("/:inspection_id/form", inspectionFormHandler.GetForm)
+				inspectorOnly.POST("/:inspection_id/sign", inspectionHandler.SignInspection)
+			}
+
+			// Khusus SPV/Admin (Approval)
+			inspection.POST("/:inspection_id/approve", middleware.RequireAdminLike(), inspectionHandler.Approve)
 		}
 
 		// =================================================

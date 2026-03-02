@@ -81,6 +81,22 @@ func (u *InspectionUsecase) GetByID(id string) (*domain.Inspection, error) {
 	return u.inspectionRepo.GetByID(id)
 }
 
-func (u *InspectionUsecase) ListByStatus(status string) ([]domain.Inspection, error) {
-	return u.inspectionRepo.ListByStatus(status)
+func (u *InspectionUsecase) ListByStatus(status string, inspectorID string) ([]domain.Inspection, error) {
+	// 🔥 Kirimkan kedua argumen ke repository
+	return u.inspectionRepo.ListByStatus(status, inspectorID)
+}
+
+func (u *InspectionUsecase) SignInspection(id string, signature string) error {
+
+	inspection, _ := u.inspectionRepo.GetByID(id)
+
+	if inspection.Status != "inspected" {
+		return errors.New("inspection already signed")
+	}
+
+	if err := u.inspectionRepo.SaveSignature(id, signature); err != nil {
+		return err
+	}
+
+	return u.inspectionRepo.UpdateStatus(id, "waiting_spv", nil)
 }
