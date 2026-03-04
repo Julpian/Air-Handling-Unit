@@ -10,6 +10,7 @@ type InspectionReport struct {
 	Inspector    string
 	Signature    string // ✅ SATU SAJA
 
+	SPVName      string
 	SPVSignature string
 	SPVSignedAt  *time.Time
 

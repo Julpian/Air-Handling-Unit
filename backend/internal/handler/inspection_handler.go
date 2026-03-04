@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"ahu-backend/internal/domain"
 	"ahu-backend/internal/middleware"
@@ -61,7 +62,7 @@ func (h *InspectionHandler) List(c *gin.Context) {
 		return
 	}
 
-	role := user.Role
+	role := strings.ToLower(user.Role)
 	userID := user.ID
 
 	// DEBUG untuk memastikan role sudah terisi (cek di terminal nanti)
@@ -219,4 +220,37 @@ func (h *InspectionHandler) Approve(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (h *InspectionHandler) VerifyInspection(c *gin.Context) {
+	id := c.Param("id")
+	fmt.Println("DEBUG: Hit VerifyInspection for ID:", id)
+
+	// Panggil repository/usecase untuk ambil data verifikasi
+	data, err := h.queryUC.GetVerificationData(id)
+	if err != nil {
+		fmt.Println("DEBUG: DB Error or Not Found:", err)
+		c.JSON(404, gin.H{"error": "Dokumen tidak ditemukan atau belum di-approve"})
+		return
+	}
+
+	// Format Periode agar rapi (sama dengan logika di PDF)
+	displayPeriod := data.Period
+	p := strings.ToLower(data.Period)
+	if strings.Contains(p, "bulan") || strings.Contains(p, "month") {
+		displayPeriod = "Monthly (1 Month)"
+	} else if strings.Contains(p, "6") {
+		displayPeriod = "6 Months"
+	} else if strings.Contains(p, "tahun") || strings.Contains(p, "year") {
+		displayPeriod = "Yearly (1 Year)"
+	}
+
+	c.JSON(200, gin.H{
+		"inspection_id":  data.InspectionID,
+		"unit_code":      data.UnitCode,
+		"period":         displayPeriod,
+		"inspector_name": data.Inspector,
+		"spv_name":       data.SPVName,
+		"inspected_at":   data.InspectedAt.Format("02 January 2006"),
+	})
 }

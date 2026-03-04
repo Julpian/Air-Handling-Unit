@@ -385,3 +385,41 @@ func (r *InspectionPostgresRepository) ApproveInspection(id string, spvID string
 
 	return nil
 }
+
+func (r *InspectionPostgresRepository) GetVerificationData(id string) (*domain.InspectionReport, error) {
+	// 🔥 PERBAIKAN: Tambahkan JOIN agar tabel a, sp, u_ins, dan u_spv terbaca
+	query := `
+    SELECT 
+        i.id, a.unit_code, sp.period, 
+        u_ins.name as inspector_name, 
+        COALESCE(u_spv.name, 'Awaiting Approval') as spv_name, 
+        i.inspected_at,
+        i.status 
+    FROM inspections i
+    JOIN schedules s ON s.id = i.schedule_id           -- 🔥 Wajib ada
+    JOIN schedule_plans sp ON sp.id = s.plan_id         -- 🔥 Wajib ada
+    JOIN ahus a ON a.id = s.ahu_id                      -- 🔥 Wajib ada
+    JOIN users u_ins ON u_ins.id = i.inspector_id       -- 🔥 Wajib ada
+    LEFT JOIN users u_spv ON u_spv.id = i.approved_by   -- 🔥 Wajib ada (LEFT JOIN karena mungkin belum ada SPV)
+    WHERE i.id = $1 AND i.status IN ('waiting_spv', 'approved')
+    `
+	var d domain.InspectionReport
+	var inspectedAt *time.Time
+
+	// Scan sekarang sudah benar berjumlah 7 variabel
+	err := r.db.QueryRow(context.Background(), query, id).Scan(
+		&d.InspectionID, // 1
+		&d.UnitCode,     // 2
+		&d.Period,       // 3
+		&d.Inspector,    // 4
+		&d.SPVName,      // 5
+		&inspectedAt,    // 6
+		&d.Status,       // 7
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	d.InspectedAt = inspectedAt
+	return &d, nil
+}

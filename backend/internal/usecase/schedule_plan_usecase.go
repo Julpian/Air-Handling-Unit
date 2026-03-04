@@ -37,13 +37,21 @@ func (u *SchedulePlanUsecase) Create(
 	}
 
 	switch period {
-	case "monthly":
-		// BULANAN → month HARUS NULL
+
+	case domain.PeriodMonthly: // "bulanan"
 		month = nil
 
-	case "semester", "yearly":
+	case domain.PeriodSixMonth: // "enam_bulan"
 		if month == nil {
-			return errors.New("bulan wajib diisi untuk semester / tahunan")
+			return errors.New("bulan wajib diisi untuk enam_bulan")
+		}
+		if *month < 1 || *month > 12 {
+			return errors.New("bulan tidak valid")
+		}
+
+	case domain.PeriodYearly: // "tahunan"
+		if month == nil {
+			return errors.New("bulan wajib diisi untuk tahunan")
 		}
 		if *month < 1 || *month > 12 {
 			return errors.New("bulan tidak valid")
@@ -78,12 +86,15 @@ func (u *SchedulePlanUsecase) Update(
 	}
 
 	switch period {
-	case "monthly":
+
+	case domain.PeriodMonthly:
 		month = nil
-	case "semester", "yearly":
+
+	case domain.PeriodSixMonth, domain.PeriodYearly:
 		if month == nil {
 			return errors.New("bulan wajib diisi")
 		}
+
 	default:
 		return errors.New("periode tidak valid")
 	}

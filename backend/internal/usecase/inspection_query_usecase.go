@@ -21,9 +21,8 @@ func NewInspectionQueryUsecase(
 	}
 }
 
-// 🔥 FIX: Hanya gunakan versi ini (2 parameter)
+// 🔥 FIX: Menggunakan nama field yang benar (inspectionRepo)
 func (uc *InspectionQueryUsecase) ListByStatus(status string, inspectorID string) ([]domain.Inspection, error) {
-	// FIX TYPO: Gunakan uc.inspectionRepo (sesuai nama di struct)
 	return uc.inspectionRepo.ListByStatus(status, inspectorID)
 }
 
@@ -42,4 +41,9 @@ func (uc *InspectionQueryUsecase) ListDropdown() ([]*dto.InspectorDropdownDTO, e
 	}
 
 	return result, nil
+}
+
+// 🔥 FIX: Ganti uc.repo menjadi uc.inspectionRepo agar tidak error undefined
+func (uc *InspectionQueryUsecase) GetVerificationData(id string) (*domain.InspectionReport, error) {
+	return uc.inspectionRepo.GetVerificationData(id)
 }

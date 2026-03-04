@@ -20,6 +20,7 @@ type InspectionRepository interface {
 	ClearScanToken(id string) error
 	GetByScheduleID(scheduleID string) (*domain.Inspection, error)
 	GetInspectionReport(id string) (*domain.InspectionReport, error)
+	GetVerificationData(id string) (*domain.InspectionReport, error)
 	SignInspection(id string, signature string) error
 	SaveSignature(id string, signature string) error
 	ApproveInspection(

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"ahu-backend/internal/repository"
 
 	"github.com/jung-kurt/gofpdf"
+	"github.com/skip2/go-qrcode"
 )
 
 type InspectionPDFService struct {
@@ -21,7 +21,7 @@ func NewInspectionPDFService(repo repository.InspectionRepository) *InspectionPD
 }
 
 func (s *InspectionPDFService) GenerateInspectionPDF(inspectionID string) error {
-	fmt.Println("🔥 GENERATING COMPACT ONE-PAGE PDF:", inspectionID)
+	fmt.Println("🔥 GENERATING COMPACT ONE-PAGE PDF WITH QR:", inspectionID)
 
 	os.MkdirAll("files/inspection", 0755)
 	os.MkdirAll("files/tmp", 0755)
@@ -31,140 +31,145 @@ func (s *InspectionPDFService) GenerateInspectionPDF(inspectionID string) error 
 		return fmt.Errorf("report not found")
 	}
 
+	// --- 1. GENERATE QR CODE ---
+	localIP := "10.9.118.16"
+
+	// QR diarahkan ke aplikasi Next.js (Port 3000)
+	verifyURL := fmt.Sprintf("http://%s:3000/verify/inspection/%s", localIP, inspectionID)
+
+	qrPath := fmt.Sprintf("files/tmp/qr-%s.png", inspectionID)
+	err = qrcode.WriteFile(verifyURL, qrcode.Medium, 256, qrPath)
+	if err != nil {
+		return fmt.Errorf("failed to generate QR: %v", err)
+	}
+
 	// Inisialisasi PDF
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(10, 10, 10)
-	pdf.SetAutoPageBreak(false, 0) // Paksa satu halaman
+	pdf.SetAutoPageBreak(false, 0)
 	pdf.AddPage()
 
 	// --- DEFINISI WARNA ---
-	themeColor := func() { pdf.SetTextColor(13, 148, 136) } // Dark Teal
-	headerBg := func() { pdf.SetFillColor(241, 245, 249) }  // Slate Light Gray
-	textColor := func() { pdf.SetTextColor(30, 41, 59) }    // Dark Slate
-	mutedText := func() { pdf.SetTextColor(100, 116, 139) } // Muted Gray
+	themeColor := func() { pdf.SetTextColor(13, 148, 136) }
+	headerBg := func() { pdf.SetFillColor(241, 245, 249) }
+	textColor := func() { pdf.SetTextColor(30, 41, 59) }
+	mutedText := func() { pdf.SetTextColor(100, 116, 139) }
 
-	// --- 1. HEADER (LOGO & JUDUL) ---
+	// --- 2. HEADER (LOGO & JUDUL) ---
 	logoPath := "public/logo.png"
 	if _, err := os.Stat(logoPath); err == nil {
-		pdf.ImageOptions(logoPath, 165, 8, 35, 0, false, gofpdf.ImageOptions{ReadDpi: true}, 0, "")
+		pdf.ImageOptions(logoPath, 10, 10, 35, 0, false, gofpdf.ImageOptions{ReadDpi: true}, 0, "")
 	}
 
+	pdf.SetXY(48, 11)
 	pdf.SetFont("Arial", "B", 14)
 	themeColor()
-	pdf.SetXY(10, 10)
 	pdf.CellFormat(100, 6, "INSPECTION REPORT", "", 1, "L", false, 0, "")
 
+	pdf.SetX(48)
 	pdf.SetFont("Arial", "B", 7.5)
 	mutedText()
 	pdf.CellFormat(100, 4, "AIR HANDLING UNIT SYSTEM - PREVENTIVE MAINTENANCE", "", 1, "L", false, 0, "")
 
-	pdf.Ln(2)
+	// 🔥 SISIPKAN QR CODE (Di pojok kanan atas agar tidak tertutup kotak info)
+	pdf.ImageOptions(qrPath, 170, 39, 28, 28, false, gofpdf.ImageOptions{ReadDpi: true}, 0, "")
+	pdf.SetFont("Arial", "B", 5)
+	pdf.SetXY(170, 67)
+	pdf.CellFormat(28, 3, "SCAN TO VERIFY", "", 0, "C", false, 0, "")
 
-	// --- 2. INTEGRATED INFO BOX (PADAT & SELARAS) ---
+	pdf.Ln(10)
+
+	// --- 3. DYNAMIC INFO BOX ---
 	pdf.SetDrawColor(226, 232, 240)
 	headerBg()
-	pdf.Rect(10, 22, 190, 32, "F")
+	pdf.Rect(10, 39, 155, 28, "F") // Lebar dikurangi (155mm) agar tidak menabrak QR
 
-	// 🔥 LOGIKA PERIODE OTOMATIS (Ambil langsung dari data record)
+	// Mapping Periode Otomatis
 	displayPeriod := "-"
 	p := strings.TrimSpace(strings.ToLower(report.Period))
-	switch p {
-	case "bulanan":
-		displayPeriod = "1 Month"
-	case "enam_bulan":
+	if strings.Contains(p, "bulan") || strings.Contains(p, "month") {
+		displayPeriod = "Monthly (1 Month)"
+	} else if strings.Contains(p, "6") {
 		displayPeriod = "6 Months"
-	case "tahunan":
-		displayPeriod = "1 Year"
-	default:
-		// Jika data di DB masih 'monthly' dll, tetap tercover
-		if strings.Contains(p, "month") || strings.Contains(p, "bulan") {
-			displayPeriod = "1 Month"
-		} else if strings.Contains(p, "6") {
-			displayPeriod = "6 Months"
-		} else {
-			displayPeriod = report.Period // Fallback ke teks asli jika tidak cocok
-		}
+	} else if strings.Contains(p, "tahunan") || strings.Contains(p, "year") {
+		displayPeriod = "Yearly (1 Year)"
+	} else {
+		displayPeriod = report.Period
 	}
 
 	textColor()
-	// Row 1
-	pdf.SetXY(12, 24)
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "ID Unit AHU", "", 0, "L", false, 0, "")
-	pdf.SetFont("Arial", "", 7)
-	pdf.CellFormat(65, 5, ": "+report.UnitCode, "", 0, "L", false, 0, "")
 
+	// Data Row 1
+	pdf.SetXY(12, 41)
+	pdf.CellFormat(25, 5, "ID Unit AHU", "", 0, "L", false, 0, "")
+	pdf.SetFont("Arial", "", 7)
+	pdf.CellFormat(55, 5, ": "+report.UnitCode, "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "Document No.", "", 0, "L", false, 0, "")
+	pdf.CellFormat(25, 5, "Document No.", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "", 7)
-	pdf.CellFormat(65, 5, ": F-I-EM-04-061-01/02", "", 1, "L", false, 0, "")
+	pdf.CellFormat(45, 5, ": F-I-EM-04-061-01/02", "", 1, "L", false, 0, "")
 
-	// Row 2
+	// Data Row 2
 	pdf.SetX(12)
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "Area Name", "", 0, "L", false, 0, "")
+	pdf.CellFormat(25, 5, "Area Name", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "", 7)
-	pdf.CellFormat(65, 5, ": "+report.AreaName, "", 0, "L", false, 0, "")
-
+	pdf.CellFormat(55, 5, ": "+report.AreaName, "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "Effective Date", "", 0, "L", false, 0, "")
+	pdf.CellFormat(25, 5, "Effective Date", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "", 7)
-	pdf.CellFormat(65, 5, ": 30 AUG 2023", "", 1, "L", false, 0, "")
+	pdf.CellFormat(45, 5, ": 30 AUG 2023", "", 1, "L", false, 0, "")
 
-	// Row 3
+	// Data Row 3
 	pdf.SetX(12)
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "Room Location", "", 0, "L", false, 0, "")
+	pdf.CellFormat(25, 5, "Room Location", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "", 7)
-	pdf.CellFormat(65, 5, ": "+report.RoomName, "", 0, "L", false, 0, "")
-
+	pdf.CellFormat(55, 5, ": "+report.RoomName, "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "Period", "", 0, "L", false, 0, "")
-	pdf.SetFont("Arial", "B", 7)
+	pdf.CellFormat(25, 5, "Period", "", 0, "L", false, 0, "")
 	themeColor()
-	pdf.CellFormat(65, 5, ": "+displayPeriod, "", 1, "L", false, 0, "") // 🔥 Menampilkan Periode Otomatis
+	pdf.CellFormat(45, 5, ": "+displayPeriod, "", 1, "L", false, 0, "")
 
-	// Row 4
+	// Data Row 4
 	textColor()
 	pdf.SetX(12)
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "Manufacture", "", 0, "L", false, 0, "")
+	pdf.CellFormat(25, 5, "Manufacture", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "", 7)
-	pdf.CellFormat(65, 5, ": "+report.Vendor, "", 0, "L", false, 0, "")
-
+	pdf.CellFormat(55, 5, ": "+report.Vendor, "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "Cleanliness Class", "", 0, "L", false, 0, "")
+	pdf.CellFormat(25, 5, "Cleanliness Class", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "", 7)
-	pdf.CellFormat(65, 5, ": "+report.CleanlinessClass, "", 1, "L", false, 0, "")
+	pdf.CellFormat(45, 5, ": "+report.CleanlinessClass, "", 1, "L", false, 0, "")
 
-	// Row 5
+	// Data Row 5
 	pdf.SetX(12)
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "Date Executed", "", 0, "L", false, 0, "")
+	pdf.CellFormat(25, 5, "Date Executed", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "", 7)
 	tglStr := "-"
 	if report.InspectedAt != nil {
 		tglStr = report.InspectedAt.Format("02 January 2006")
 	}
-	pdf.CellFormat(65, 5, ": "+tglStr, "", 0, "L", false, 0, "")
-
+	pdf.CellFormat(55, 5, ": "+tglStr, "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "B", 7)
-	pdf.CellFormat(30, 5, "Revision", "", 0, "L", false, 0, "")
+	pdf.CellFormat(25, 5, "Revision", "", 0, "L", false, 0, "")
 	pdf.SetFont("Arial", "", 7)
-	pdf.CellFormat(65, 5, ": 02", "", 1, "L", false, 0, "")
+	pdf.CellFormat(45, 5, ": 02", "", 1, "L", false, 0, "")
 
-	pdf.Ln(4)
+	pdf.SetXY(10, 72) // Mulai tabel di bawah kotak info
 
-	// --- 3. COMPACT INSPECTION TABLE ---
+	// --- 4. INSPECTION TABLE ---
 	pdf.SetFont("Arial", "B", 8)
-	pdf.SetFillColor(51, 65, 85) // Dark Slate
+	pdf.SetFillColor(51, 65, 85)
 	pdf.SetTextColor(255, 255, 255)
 
-	colWidths := []float64{10, 100, 40, 40}
-	pdf.CellFormat(colWidths[0], 7, "NO", "1", 0, "C", true, 0, "")
-	pdf.CellFormat(colWidths[1], 7, "ACTIVITY ITEM", "1", 0, "C", true, 0, "")
-	pdf.CellFormat(colWidths[2], 7, "ACTUAL VALUE", "1", 0, "C", true, 0, "")
-	pdf.CellFormat(colWidths[3], 7, "RESULT", "1", 1, "C", true, 0, "")
+	pdf.CellFormat(10, 7, "NO", "1", 0, "C", true, 0, "")
+	pdf.CellFormat(100, 7, "ACTIVITY ITEM", "1", 0, "C", true, 0, "")
+	pdf.CellFormat(40, 7, "ACTUAL VALUE", "1", 0, "C", true, 0, "")
+	pdf.CellFormat(40, 7, "RESULT", "1", 1, "C", true, 0, "")
 
 	no := 1
 	textColor()
@@ -180,11 +185,10 @@ func (s *InspectionPDFService) GenerateInspectionPDF(inspectionID string) error 
 			} else {
 				pdf.SetFillColor(248, 250, 252)
 			}
-
-			h := 6.0
-			pdf.CellFormat(colWidths[0], h, fmt.Sprint(no), "1", 0, "C", true, 0, "")
-			pdf.CellFormat(colWidths[1], h, " "+it.Label, "1", 0, "L", true, 0, "")
-			pdf.CellFormat(colWidths[2], h, it.Value, "1", 0, "C", true, 0, "")
+			h := 5.8
+			pdf.CellFormat(10, h, fmt.Sprint(no), "1", 0, "C", true, 0, "")
+			pdf.CellFormat(100, h, " "+it.Label, "1", 0, "L", true, 0, "")
+			pdf.CellFormat(40, h, it.Value, "1", 0, "C", true, 0, "")
 
 			resClean := strings.ToLower(it.Result)
 			if resClean == "pass" || resClean == "ok" {
@@ -193,7 +197,7 @@ func (s *InspectionPDFService) GenerateInspectionPDF(inspectionID string) error 
 				pdf.SetTextColor(220, 38, 38)
 			}
 			pdf.SetFont("Arial", "B", 7)
-			pdf.CellFormat(colWidths[3], h, strings.ToUpper(it.Result), "1", 1, "C", true, 0, "")
+			pdf.CellFormat(40, h, strings.ToUpper(it.Result), "1", 1, "C", true, 0, "")
 
 			textColor()
 			pdf.SetFont("Arial", "", 7)
@@ -201,16 +205,17 @@ func (s *InspectionPDFService) GenerateInspectionPDF(inspectionID string) error 
 		}
 	}
 
-	// --- 4. SIGNATURE SECTION (FIXED POSITION) ---
-	pdf.SetY(248)
-	pdf.SetDrawColor(203, 213, 225)
+	// --- 5. SIGNATURE SECTION ---
+	pdf.SetY(250) // Posisikan di dasar halaman
 	ySign := pdf.GetY()
+	pdf.SetDrawColor(203, 213, 225)
 
 	// Box Inspector
 	pdf.SetXY(20, ySign)
 	pdf.SetFont("Arial", "B", 7.5)
 	pdf.CellFormat(60, 5, "Executed By (Inspector)", "", 1, "C", false, 0, "")
 	if report.Signature != "" {
+		// Pastikan koordinat Y adalah ySign + 4 agar pas di tengah
 		s.embedSignature(pdf, report.Signature, 30, ySign+4, 40, 15, inspectionID+"-ins")
 	}
 	pdf.SetXY(20, ySign+20)
@@ -219,7 +224,7 @@ func (s *InspectionPDFService) GenerateInspectionPDF(inspectionID string) error 
 	pdf.SetX(20)
 	pdf.CellFormat(60, 4, "Date: "+tglStr, "", 1, "C", false, 0, "")
 
-	// Box Supervisor
+	// Box Supervisor (Kanan)
 	textColor()
 	pdf.SetXY(130, ySign)
 	pdf.SetFont("Arial", "B", 7.5)
@@ -233,11 +238,11 @@ func (s *InspectionPDFService) GenerateInspectionPDF(inspectionID string) error 
 	pdf.SetX(130)
 	pdf.CellFormat(60, 4, "Digitally Approved", "", 1, "C", false, 0, "")
 
-	// --- 5. FOOTER ---
-	pdf.SetY(-10)
-	pdf.SetFont("Arial", "I", 6.5)
-	footerTxt := fmt.Sprintf("AIRA System - Generated on %s | PT Kimia Farma Industrial Hub", time.Now().Format("2006-01-02 15:04"))
-	pdf.CellFormat(0, 10, footerTxt, "0", 0, "C", false, 0, "")
+	// --- 6. FOOTER ---
+	pdf.SetY(-8)
+	pdf.SetFont("Arial", "I", 6)
+	footerTxt := fmt.Sprintf("AIRA SECURE DOC ID: %s | PT Kimia Farma Hub", inspectionID)
+	pdf.CellFormat(0, 5, footerTxt, "0", 0, "C", false, 0, "")
 
 	path := fmt.Sprintf("files/inspection/%s.pdf", inspectionID)
 	return pdf.OutputFileAndClose(path)

@@ -187,6 +187,7 @@ func main() {
 	// 🔥 STATIC & LIMIT
 	r.MaxMultipartMemory = 8 << 20
 	r.Static("/uploads", "./uploads")
+	r.Static("/api/files", "./files")
 	r.Static("/files", "./files")
 	r.LoadHTMLGlob("templates/*")
 

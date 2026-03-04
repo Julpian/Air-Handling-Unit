@@ -45,8 +45,19 @@ func (h *SchedulePlanHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if req.Period != "monthly" && req.Month == nil {
+	if req.Period != "bulanan" && req.Month == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bulan wajib diisi"})
+		return
+	}
+
+	validPeriods := map[string]bool{
+		"bulanan":    true,
+		"enam_bulan": true,
+		"tahunan":    true,
+	}
+
+	if !validPeriods[req.Period] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "period tidak valid"})
 		return
 	}
 

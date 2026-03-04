@@ -22,6 +22,7 @@ func RegisterRoutes(
 	// ================= PUBLIC =================
 	api.POST("/auth/login", handlers.Login)
 	api.GET("/public/verify/:token", scheduleHandler.Verify)
+	api.GET("/public/verify/inspection/:id", inspectionHandler.VerifyInspection)
 
 	// ================= AUTHENTICATED =================
 	secured := api.Group("")
