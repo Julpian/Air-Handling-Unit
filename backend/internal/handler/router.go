@@ -141,6 +141,10 @@ func RegisterRoutes(
 			admin.GET("/schedule/:year", handlers.GetScheduleApproval)
 			admin.GET("/schedule/:year/pdf", handlers.DownloadSchedulePDF)
 			admin.GET("/public/verify/:token", handlers.VerifySchedule)
+
+			admin.POST("/filter-schedules", handlers.CreateFilterSchedule)
+			admin.GET("/dashboard", handlers.Dashboard)
+			admin.GET("/dashboard/filter-pressure", handlers.FilterPressureChart)
 		}
 	}
 }

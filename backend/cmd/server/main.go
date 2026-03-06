@@ -75,6 +75,11 @@ func main() {
 		schedulePlanRepo,
 		scheduleRepo,
 	)
+
+	createFilterScheduleUC := usecase.NewCreateFilterScheduleUsecase(
+		scheduleRepo,
+		schedulePlanRepo,
+	)
 	approveInspectionUsecase := usecase.NewApproveInspectionUsecase(
 		inspectionRepo,
 	)
@@ -83,6 +88,11 @@ func main() {
 		formRepo,
 		ahuRepo,
 		scheduleRepo,
+	)
+
+	dashboardUC := usecase.NewDashboardUsecase(
+		scheduleRepo,
+		inspectionRepo,
 	)
 
 	submitInspectionFormUC := usecase.NewSubmitInspectionFormUsecase(
@@ -147,10 +157,12 @@ func main() {
 		authUC,
 		userManagementUC,
 		schedulePlanUC,
+		createFilterScheduleUC,
 		generateScheduleUC,
 		inspectionUC,
 		inspectionApprovalUC,
 		scheduleApprovalUC,
+		dashboardUC,
 		auditUC,
 		ahuUC,
 		createFormTemplateUC,
@@ -195,7 +207,7 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			"http://localhost:3000",
-			"http://10.9.118.16:3000", // HP / LAN
+			"http://172.20.10.5:3000", // HP / LAN
 		},
 		AllowMethods: []string{
 			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",

@@ -21,6 +21,7 @@ type InspectionRepository interface {
 	GetByScheduleID(scheduleID string) (*domain.Inspection, error)
 	GetInspectionReport(id string) (*domain.InspectionReport, error)
 	GetVerificationData(id string) (*domain.InspectionReport, error)
+	GetFilterPressureChart() ([]domain.FilterPressureChartRow, error)
 	SignInspection(id string, signature string) error
 	SaveSignature(id string, signature string) error
 	ApproveInspection(

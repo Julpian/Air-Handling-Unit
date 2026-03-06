@@ -423,3 +423,48 @@ func (r *InspectionPostgresRepository) GetVerificationData(id string) (*domain.I
 	d.InspectedAt = inspectedAt
 	return &d, nil
 }
+
+func (r *InspectionPostgresRepository) GetFilterPressureChart() ([]domain.FilterPressureChartRow, error) {
+
+	rows, err := r.db.Query(context.Background(), `
+	SELECT
+		DATE_TRUNC('month', ir.created_at) AS month,
+		fi.label,
+		AVG(NULLIF(ir.value_text,'')::numeric) as value
+	FROM inspection_results ir
+	JOIN form_template_items fi ON fi.id = ir.form_item_id
+	JOIN inspections i ON i.id = ir.inspection_id
+	JOIN schedules s ON s.id = i.schedule_id
+	JOIN schedule_plans sp ON sp.id = s.plan_id
+	WHERE sp.period = 'bulanan'
+	AND fi.label ILIKE '%Delta%'
+	GROUP BY DATE_TRUNC('month', ir.created_at), fi.label
+	ORDER BY DATE_TRUNC('month', ir.created_at)
+	`)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []domain.FilterPressureChartRow
+
+	for rows.Next() {
+
+		var row domain.FilterPressureChartRow
+
+		err := rows.Scan(
+			&row.Month,
+			&row.Label,
+			&row.Value,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, row)
+	}
+
+	return result, nil
+}

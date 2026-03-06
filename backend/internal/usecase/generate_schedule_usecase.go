@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"fmt"
 	"time"
 
 	"ahu-backend/internal/domain"
@@ -26,6 +27,7 @@ func NewGenerateScheduleUsecase(
 
 func (u *GenerateScheduleUsecase) Generate(year int) error {
 	plans, err := u.planRepo.GetActiveByYear(year)
+	fmt.Println("TOTAL PLANS:", len(plans))
 	if err != nil {
 		return err
 	}
@@ -39,6 +41,7 @@ func (u *GenerateScheduleUsecase) Generate(year int) error {
 		}
 
 		ranges := buildWeekRanges(plan, year)
+		fmt.Println("PLAN:", plan.ID, "RANGES:", len(ranges))
 
 		for _, r := range ranges {
 			err := u.scheduleRepo.Create(&domain.Schedule{

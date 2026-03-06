@@ -20,7 +20,7 @@ type CreateFormTemplateRequest struct {
 
 		Items []struct {
 			Label    string `json:"label" binding:"required"`
-			Type     string `json:"type" binding:"required"`
+			InputType string `json:"input_type" binding:"required"`
 			Required bool   `json:"required"`
 		} `json:"items" binding:"required"`
 	} `json:"sections" binding:"required"`
@@ -54,7 +54,7 @@ func (h *Handlers) CreateFormTemplate(c *gin.Context) {
 			section.Items = append(section.Items, domain.FormItem{
 				ID:        uuid.NewString(),
 				Label:     i.Label,
-				InputType: i.Type,
+				InputType: i.InputType,
 				Required:  i.Required,
 				Order:     itemIndex + 1,
 			})

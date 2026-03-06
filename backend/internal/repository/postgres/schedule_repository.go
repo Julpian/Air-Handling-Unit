@@ -96,8 +96,8 @@ func (r *SchedulePostgresRepository) ListAll() ([]domain.Schedule, error) {
 			inspector_id,
 			status,
 			nfc_bypass,
-			created_at
-			sp.period,          -- 🔥 Tambahkan ini
+			created_at,
+			sp.period         -- 🔥 Tambahkan ini
 		FROM schedules
 		ORDER BY start_date ASC
 	`
@@ -316,7 +316,6 @@ func (r *SchedulePostgresRepository) GetActiveByAHU(
 	JOIN schedule_plans sp ON sp.id = s.plan_id
 
 	WHERE s.ahu_id = $1
-	  AND s.inspector_id IS NOT NULL
 	  AND s.status = 'siap_diperiksa'
 	  AND CURRENT_DATE BETWEEN s.start_date AND s.end_date
 
@@ -416,10 +415,9 @@ func (r *SchedulePostgresRepository) ListWithDetailByYear(year int) ([]*domain.S
 	FROM schedules s
 	JOIN schedule_plans sp ON sp.id = s.plan_id
 	JOIN ahus a ON a.id = s.ahu_id
-	JOIN users u ON u.id = s.inspector_id   -- 🔥 WAJIB ADA INSPECTOR
+	LEFT JOIN users u ON u.id = s.inspector_id   -- 🔥 UBAH KE LEFT JOIN
 
 	WHERE EXTRACT(YEAR FROM s.start_date) = $1
-	AND s.inspector_id IS NOT NULL        -- 🔥 FILTER FINAL
 
 	ORDER BY s.start_date ASC
 	`
@@ -563,4 +561,37 @@ func (r *SchedulePostgresRepository) ListTasksByInspector(
 	}
 
 	return result, nil
+}
+
+func (r *SchedulePlanPostgresRepository) GetByPeriod(
+	period string,
+	ahuID string,
+) (*domain.SchedulePlan, error) {
+
+	var plan domain.SchedulePlan
+
+	err := r.db.QueryRow(context.Background(), `
+	SELECT id, ahu_id, period
+	FROM schedule_plans
+	WHERE period=$1 AND ahu_id=$2
+	LIMIT 1
+	`,
+		period,
+		ahuID,
+	).Scan(
+		&plan.ID,
+		&plan.AHUId,
+		&plan.Period,
+	)
+
+	if err != nil {
+
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &plan, nil
 }

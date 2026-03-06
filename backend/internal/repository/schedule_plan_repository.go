@@ -10,4 +10,5 @@ type SchedulePlanRepository interface {
 	ListAllWithAHU() ([]domain.SchedulePlanWithAHU, error)
 	GetActiveByYear(year int) ([]domain.SchedulePlan, error)
 	MarkGenerated(planID string) error
+	GetByPeriod(string, string) (*domain.SchedulePlan, error)
 }

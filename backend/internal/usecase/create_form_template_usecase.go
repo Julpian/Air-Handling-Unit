@@ -24,9 +24,6 @@ func (uc *CreateFormTemplateUsecase) Execute(
 	template *domain.FormTemplate,
 ) error {
 
-	// ===============================
-	// VALIDATION (BUSINESS RULE)
-	// ===============================
 	if template.Name == "" {
 		return errors.New("nama form wajib diisi")
 	}
@@ -40,6 +37,7 @@ func (uc *CreateFormTemplateUsecase) Execute(
 	}
 
 	for _, sec := range template.Sections {
+
 		if sec.Title == "" {
 			return errors.New("judul section tidak boleh kosong")
 		}
@@ -49,17 +47,17 @@ func (uc *CreateFormTemplateUsecase) Execute(
 		}
 
 		for _, item := range sec.Items {
+
 			if item.Label == "" {
 				return errors.New("label item tidak boleh kosong")
 			}
-			if item.InputType == "" {
-				return errors.New("tipe input wajib diisi")
+
+			if !domain.IsValidInputType(item.InputType) {
+				return errors.New("tipe input tidak valid")
 			}
+
 		}
 	}
 
-	// ===============================
-	// EXECUTE CREATE
-	// ===============================
 	return uc.formRepo.CreateTemplate(ctx, template)
 }

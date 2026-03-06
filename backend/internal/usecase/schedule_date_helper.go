@@ -45,27 +45,31 @@ func buildWeekRanges(
 
 	switch plan.Period {
 
-	case "monthly":
-		months = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+	case "bulanan":
+		months = []int{1,2,3,4,5,6,7,8,9,10,11,12}
 
-	case "semester":
+	case "enam_bulan":
 		if plan.Month == nil {
 			return ranges
 		}
+
 		m := *plan.Month
 		months = []int{m}
+
 		if m+6 <= 12 {
 			months = append(months, m+6)
 		}
 
-	case "yearly":
+	case "tahunan":
 		if plan.Month == nil {
 			return ranges
 		}
+
 		months = []int{*plan.Month}
 	}
 
 	for _, m := range months {
+
 		start, end := weekRangeOfMonth(
 			year,
 			time.Month(m),

@@ -9,8 +9,10 @@ type Handlers struct {
 	AuthUC *usecase.AuthUsecase
 
 	GenerateScheduleUC  *usecase.GenerateScheduleUsecase
+	CreateFilterScheduleUC *usecase.CreateFilterScheduleUsecase
 	ScheduleAssignUC    *usecase.ScheduleAssignUsecase
 	ScheduleBypassNFCUC *usecase.ScheduleBypassNFCUsecase
+	dashboardUsecase *usecase.DashboardUsecase
 
 	InspectionUC         *usecase.InspectionUsecase
 	InspectionApprovalUC *usecase.InspectionApprovalUsecase
@@ -39,10 +41,12 @@ func NewHandlers(
 	authUC *usecase.AuthUsecase,
 	userManagementUC *usecase.UserManagementUsecase,
 	schedulePlanUC *usecase.SchedulePlanUsecase,
+	createFilterScheduleUC *usecase.CreateFilterScheduleUsecase,
 	generateUC *usecase.GenerateScheduleUsecase,
 	inspectionUC *usecase.InspectionUsecase,
 	inspectionApprovalUC *usecase.InspectionApprovalUsecase,
 	scheduleApprovalUC *usecase.ScheduleApprovalUsecase,
+	dashboardUsecase *usecase.DashboardUsecase,
 	auditUC *usecase.AuditTrailUsecase,
 	ahuUC *usecase.AHUUsecase,
 
@@ -60,11 +64,13 @@ func NewHandlers(
 		AuthUC:               authUC,
 		UserManagementUC:     userManagementUC,
 		SchedulePlanUC:       schedulePlanUC,
+		CreateFilterScheduleUC: createFilterScheduleUC,
 		GenerateUC:           generateUC,
 		AuditUC:              auditUC,
 		AHUUC:                ahuUC,
 		InspectionApprovalUC: inspectionApprovalUC,
 		ScheduleApprovalUC:   scheduleApprovalUC,
+		dashboardUsecase: dashboardUsecase,
 
 		createFormTemplateUsecase:           createFormTemplateUC,
 		getFormTemplateDetailUsecase:        getFormTemplateDetailUC,
