@@ -13,26 +13,27 @@ type BuildingHandler struct {
 func NewBuildingHandler(uc *usecase.BuildingUsecase) *BuildingHandler {
 	return &BuildingHandler{uc: uc}
 }
-
 func (h *BuildingHandler) Create(c *gin.Context) {
-	var req struct {
-		Name        string  `json:"name"`
-		Description *string `json:"description"`
-	}
+    adminID := c.GetString("user_id")
+    adminName := c.GetString("user_name")
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
+    var req struct {
+        Name        string  `json:"name"`
+        Description *string `json:"description"`
+    }
 
-	userID := c.GetString("user_id")
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
 
-	if err := h.uc.Create(req.Name, req.Description, userID); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
+    // PERBAIKAN: Cukup panggil satu kali dengan parameter lengkap
+    if err := h.uc.Create(req.Name, req.Description, adminID, adminName); err != nil {
+        c.JSON(400, gin.H{"error": err.Error()})
+        return
+    }
 
-	c.JSON(201, gin.H{"message": "building created"})
+    c.JSON(201, gin.H{"message": "building created"})
 }
 
 func (h *BuildingHandler) List(c *gin.Context) {

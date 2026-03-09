@@ -9,13 +9,14 @@ import (
 
 type AHUUsecase struct {
 	repo repository.AHURepository
+	auditUC *AuditTrailUsecase
 }
 
-func NewAHUUsecase(r repository.AHURepository) *AHUUsecase {
-	return &AHUUsecase{repo: r}
+func NewAHUUsecase(r repository.AHURepository, audit *AuditTrailUsecase) *AHUUsecase {
+    return &AHUUsecase{repo: r, auditUC: audit}
 }
 
-func (u *AHUUsecase) Create(ahu *domain.AHU, adminID string) error {
+func (u *AHUUsecase) Create(ahu *domain.AHU, adminID string, adminName string) error {
 	if ahu.UnitCode == "" {
 		return errors.New("unit code AHU wajib diisi") // ✅ konsisten
 	}
@@ -32,7 +33,20 @@ func (u *AHUUsecase) Create(ahu *domain.AHU, adminID string) error {
 		return errors.New("kelas kebersihan harus E, F, atau G")
 	}
 
-	return u.repo.Create(ahu)
+	err := u.repo.Create(ahu)
+    if err == nil {
+        u.auditUC.Log(&domain.AuditTrail{
+            UserID:   adminID,
+            Action:   "CREATE_AHU",
+            Entity:   "AHU",
+            EntityID: ahu.ID,
+            Metadata: map[string]interface{}{
+                "unit_code": ahu.UnitCode,
+                "name":      adminName,
+            },
+        })
+    }
+    return err
 }
 
 func (u *AHUUsecase) ListAll() ([]domain.AHU, error) {

@@ -1,12 +1,12 @@
 package domain
 
 const (
-	RoleAdmin     = "admin"
-	RoleSVP       = "svp"
-	RoleAsmen     = "asmen"
-	RoleInspector = "inspector"
+	RoleAdmin      = "admin"
+	RoleSupervisor = "Supervisor"
+	RoleAsmen      = "AssistantManager"
+	RoleInspector  = "inspector"
 )
 
 func IsAdminLike(role string) bool {
-	return role == RoleAdmin || role == RoleSVP
+	return role == RoleAdmin || role == RoleSupervisor
 }

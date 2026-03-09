@@ -61,12 +61,17 @@ func (h *SchedulePlanHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// 🔥 PANGGIL USECASE SESUAI TANDA TANGAN
+	// 🔥 ambil user dari JWT middleware
+	adminID := c.GetString("user_id")
+	adminName := c.GetString("user_name")
+
 	if err := h.SchedulePlanUC.Create(
 		req.AHUID,
 		req.Period,
 		req.WeekOfMonth,
 		req.Month,
+		adminID,
+		adminName,
 	); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -102,11 +107,16 @@ func (h *Handlers) UpdateSchedulePlan(c *gin.Context) {
 		return
 	}
 
+	adminID := c.GetString("user_id")
+	adminName := c.GetString("user_name")
+
 	if err := h.SchedulePlanUC.Update(
 		id,
 		req.Period,
 		req.WeekOfMonth,
 		req.Month,
+		adminID,
+		adminName,
 	); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
@@ -118,7 +128,14 @@ func (h *Handlers) UpdateSchedulePlan(c *gin.Context) {
 func (h *Handlers) DeleteSchedulePlan(c *gin.Context) {
 	id := c.Param("id")
 
-	if err := h.SchedulePlanUC.Delete(id); err != nil {
+	adminID := c.GetString("user_id")
+	adminName := c.GetString("user_name")
+
+	if err := h.SchedulePlanUC.Delete(
+		id,
+		adminID,
+		adminName,
+	); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}

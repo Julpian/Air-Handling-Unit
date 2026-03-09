@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"ahu-backend/internal/domain"
 
@@ -17,12 +18,15 @@ func NewAuditTrailPostgresRepository(db *pgxpool.Pool) *AuditTrailPostgresReposi
 	return &AuditTrailPostgresRepository{db: db}
 }
 
-// ================= SAVE (TIDAK DIUBAH) =================
+// ================= SAVE =================
 func (r *AuditTrailPostgresRepository) Save(audit *domain.AuditTrail) error {
+
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+
 	query := `
 		INSERT INTO audit_trails (
 			id, user_id, action, entity, entity_id, metadata, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	_, err := r.db.Exec(
@@ -34,6 +38,7 @@ func (r *AuditTrailPostgresRepository) Save(audit *domain.AuditTrail) error {
 		audit.Entity,
 		audit.EntityID,
 		audit.Metadata,
+		time.Now().In(loc), // ✅ waktu dari Go, bukan dari DB
 	)
 
 	return err
@@ -68,8 +73,10 @@ func (r *AuditTrailPostgresRepository) ListAll(
 	defer rows.Close()
 
 	var list []domain.AuditTrailView
+
 	for rows.Next() {
 		var a domain.AuditTrailView
+
 		if err := rows.Scan(
 			&a.ID,
 			&a.CreatedAt,
@@ -83,13 +90,14 @@ func (r *AuditTrailPostgresRepository) ListAll(
 		); err != nil {
 			return nil, err
 		}
+
 		list = append(list, a)
 	}
 
 	return list, nil
 }
 
-// ================= LIST BY ENTITY (DETAIL) =================
+// ================= LIST BY ENTITY =================
 func (r *AuditTrailPostgresRepository) ListByEntity(
 	entity string,
 	entityID string,
@@ -119,8 +127,10 @@ func (r *AuditTrailPostgresRepository) ListByEntity(
 	defer rows.Close()
 
 	var list []domain.AuditTrailView
+
 	for rows.Next() {
 		var a domain.AuditTrailView
+
 		if err := rows.Scan(
 			&a.ID,
 			&a.CreatedAt,
@@ -134,6 +144,7 @@ func (r *AuditTrailPostgresRepository) ListByEntity(
 		); err != nil {
 			return nil, err
 		}
+
 		list = append(list, a)
 	}
 

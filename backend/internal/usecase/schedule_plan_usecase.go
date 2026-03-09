@@ -9,14 +9,17 @@ import (
 )
 
 type SchedulePlanUsecase struct {
-	repo repository.SchedulePlanRepository
+	repo    repository.SchedulePlanRepository
+	auditUC *AuditTrailUsecase
 }
 
 func NewSchedulePlanUsecase(
 	repo repository.SchedulePlanRepository,
+	auditUC *AuditTrailUsecase,
 ) *SchedulePlanUsecase {
 	return &SchedulePlanUsecase{
-		repo: repo,
+		repo:    repo,
+		auditUC: auditUC,
 	}
 }
 
@@ -26,6 +29,8 @@ func (u *SchedulePlanUsecase) Create(
 	period string,
 	week int,
 	month *int,
+	adminID string,
+	adminName string,
 ) error {
 
 	if ahuID == "" {
@@ -38,36 +43,49 @@ func (u *SchedulePlanUsecase) Create(
 
 	switch period {
 
-	case domain.PeriodMonthly: // "bulanan"
+	case domain.PeriodMonthly:
 		month = nil
 
-	case domain.PeriodSixMonth: // "enam_bulan"
+	case domain.PeriodSixMonth:
 		if month == nil {
 			return errors.New("bulan wajib diisi untuk enam_bulan")
 		}
-		if *month < 1 || *month > 12 {
-			return errors.New("bulan tidak valid")
-		}
 
-	case domain.PeriodYearly: // "tahunan"
+	case domain.PeriodYearly:
 		if month == nil {
 			return errors.New("bulan wajib diisi untuk tahunan")
-		}
-		if *month < 1 || *month > 12 {
-			return errors.New("bulan tidak valid")
 		}
 
 	default:
 		return errors.New("periode tidak valid")
 	}
 
-	return u.repo.Create(&domain.SchedulePlan{
+	plan := &domain.SchedulePlan{
 		ID:          uuid.NewString(),
 		AHUId:       ahuID,
 		Period:      period,
 		WeekOfMonth: week,
 		Month:       month,
-	})
+	}
+
+	err := u.repo.Create(plan)
+
+	if err == nil {
+		u.auditUC.Log(&domain.AuditTrail{
+			UserID:   adminID,
+			Action:   "CREATE_SCHEDULE_PLAN",
+			Entity:   "SchedulePlan",
+			EntityID: plan.ID,
+			Metadata: map[string]interface{}{
+				"ahu_id":     ahuID,
+				"period":     period,
+				"week":       week,
+				"admin_name": adminName,
+			},
+		})
+	}
+
+	return err
 }
 
 func (u *SchedulePlanUsecase) ListAllWithAHU() ([]domain.SchedulePlanWithAHU, error) {
@@ -79,6 +97,8 @@ func (u *SchedulePlanUsecase) Update(
 	period string,
 	week int,
 	month *int,
+	adminID string,
+	adminName string,
 ) error {
 
 	if week < 1 || week > 4 {
@@ -99,17 +119,53 @@ func (u *SchedulePlanUsecase) Update(
 		return errors.New("periode tidak valid")
 	}
 
-	return u.repo.Update(&domain.SchedulePlan{
+	err := u.repo.Update(&domain.SchedulePlan{
 		ID:          id,
 		Period:      period,
 		WeekOfMonth: week,
 		Month:       month,
 	})
+
+	if err == nil {
+		u.auditUC.Log(&domain.AuditTrail{
+			UserID:   adminID,
+			Action:   "UPDATE_SCHEDULE_PLAN",
+			Entity:   "SchedulePlan",
+			EntityID: id,
+			Metadata: map[string]interface{}{
+				"period":     period,
+				"week":       week,
+				"admin_name": adminName,
+			},
+		})
+	}
+
+	return err
 }
 
-func (u *SchedulePlanUsecase) Delete(id string) error {
+func (u *SchedulePlanUsecase) Delete(
+	id string,
+	adminID string,
+	adminName string,
+) error {
+
 	if id == "" {
 		return errors.New("id tidak valid")
 	}
-	return u.repo.Delete(id)
+
+	err := u.repo.Delete(id)
+
+	if err == nil {
+		u.auditUC.Log(&domain.AuditTrail{
+			UserID:   adminID,
+			Action:   "DELETE_SCHEDULE_PLAN",
+			Entity:   "SchedulePlan",
+			EntityID: id,
+			Metadata: map[string]interface{}{
+				"admin_name": adminName,
+			},
+		})
+	}
+
+	return err
 }

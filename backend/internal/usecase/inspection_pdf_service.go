@@ -32,7 +32,7 @@ func (s *InspectionPDFService) GenerateInspectionPDF(inspectionID string) error 
 	}
 
 	// --- 1. GENERATE QR CODE ---
-	localIP := "172.20.10.5"
+	localIP := "10.9.118.16"
 
 	// QR diarahkan ke aplikasi Next.js (Port 3000)
 	verifyURL := fmt.Sprintf("http://%s:3000/verify/inspection/%s", localIP, inspectionID)

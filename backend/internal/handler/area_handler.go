@@ -23,6 +23,9 @@ func NewAreaHandler(uc *usecase.AreaUsecase) *AreaHandler {
 }
 
 func (h *AreaHandler) Create(c *gin.Context) {
+	adminID := c.GetString("user_id")
+	adminName := c.GetString("user_name")
+
 	var req struct {
 		BuildingID       string `json:"building_id"`
 		Name             string `json:"name"`
@@ -42,7 +45,7 @@ func (h *AreaHandler) Create(c *gin.Context) {
 		CleanlinessClass: strPtr(req.CleanlinessClass),
 	}
 
-	if err := h.uc.Create(area); err != nil {
+	if err := h.uc.Create(area, adminID, adminName); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}

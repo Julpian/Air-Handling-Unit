@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -13,63 +14,55 @@ import (
 )
 
 func main() {
-	// ================= DB =================
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://postgres:postgres@localhost:5432/ahu_db?sslmode=disable"
-	}
-	db := database.NewPostgresPool(dsn)
+    // 1. Force aplikasi Go pakai WIB secara internal
+    loc, _ := time.LoadLocation("Asia/Jakarta")
+    time.Local = loc
 
-	// ================= REPOSITORY =================
+    // 2. Ambil DSN dari ENV
+    dsn := os.Getenv("DATABASE_URL")
+    if dsn == "" {
+        // Tambahkan &timezone=Asia/Jakarta di akhir string
+        dsn = "postgres://postgres:postgres@localhost:5432/ahu_db?sslmode=disable&timezone=Asia/Jakarta"
+    }
+
+    db := database.NewPostgresPool(dsn)
+
 	// ================= REPOSITORY =================
 	schedulePlanRepo := postgres.NewSchedulePlanPostgresRepository(db)
-
-	// ================= USECASE =================
-	schedulePlanUC := usecase.NewSchedulePlanUsecase(schedulePlanRepo)
-
-	// ================= HANDLER =================
-	schedulePlanHandler := handler.NewSchedulePlanHandler(schedulePlanUC)
 	buildingRepo := postgres.NewBuildingPostgresRepository(db)
-	buildingUC := usecase.NewBuildingUsecase(buildingRepo)
 	areaRepo := postgres.NewAreaPostgresRepository(db)
-	areaUC := usecase.NewAreaUsecase(areaRepo)
-	areaHandler := handler.NewAreaHandler(areaUC)
-	buildingHandler := handler.NewBuildingHandler(buildingUC)
 	ahuRepo := postgres.NewAHUPostgresRepository(db)
 	scheduleRepo := postgres.NewSchedulePostgresRepository(db)
 	inspectionRepo := postgres.NewInspectionPostgresRepository(db)
 	auditRepo := postgres.NewAuditTrailPostgresRepository(db)
 	scheduleApprovalRepo := postgres.NewScheduleApprovalPostgres(db)
-	pdfService := usecase.NewSchedulePDFService(scheduleRepo)
 	userRepo := postgres.NewUserPostgresRepository(db)
-	scheduleQueryUC := usecase.NewScheduleQueryUsecase(scheduleRepo)
-	ahuUC := usecase.NewAHUUsecase(ahuRepo)
 	formRepo := postgres.NewFormPostgresRepository(db)
 	inspectionResultRepo := postgres.NewInspectionResultPostgresRepository(db)
-	createFormTemplateUC := usecase.NewCreateFormTemplateUsecase(formRepo)
-	getFormTemplateDetailUC := usecase.NewGetFormTemplateDetailUsecase(formRepo)
-	listFormTemplateUC := usecase.NewListFormTemplateUsecase(formRepo)
-	setFormTemplateActiveUC := usecase.NewSetFormTemplateActiveUsecase(formRepo)
-	inspectionPDFService := usecase.NewInspectionPDFService(inspectionRepo)
-	inspectionTaskUC := usecase.NewInspectionTaskUsecase(scheduleRepo)
-	createNewFormTemplateVersionUC :=
-		usecase.NewCreateNewFormTemplateVersionUsecase(formRepo)
-	listFormTemplateVersionsUC :=
-		usecase.NewListFormTemplateVersionsUsecase(formRepo)
-	compareFormTemplateUC :=
-		usecase.NewCompareFormTemplateUsecase(formRepo)
 
-	inspectionQueryUC := usecase.NewInspectionQueryUsecase(
-		inspectionRepo,
+	// ================= USECASE CORE =================
+	auditUC := usecase.NewAuditTrailUsecase(auditRepo)
+	authUC := usecase.NewAuthUsecase(userRepo, auditUC)
+
+	schedulePlanUC := usecase.NewSchedulePlanUsecase(schedulePlanRepo, auditUC)
+
+	buildingUC := usecase.NewBuildingUsecase(buildingRepo, auditUC)
+	areaUC := usecase.NewAreaUsecase(areaRepo, auditUC)
+
+	ahuUC := usecase.NewAHUUsecase(ahuRepo, auditUC)
+
+	userManagementUC := usecase.NewUserManagementUsecase(
 		userRepo,
+		auditRepo,
 	)
+
+	// ================= SCHEDULE =================
+	scheduleQueryUC := usecase.NewScheduleQueryUsecase(scheduleRepo)
 
 	assignScheduleUC := usecase.NewScheduleAssignUsecase(
 		scheduleRepo,
 		auditRepo,
 	)
-
-	// ================= USECASE =================
 
 	generateScheduleUC := usecase.NewGenerateScheduleUsecase(
 		schedulePlanRepo,
@@ -80,33 +73,40 @@ func main() {
 		scheduleRepo,
 		schedulePlanRepo,
 	)
-	approveInspectionUsecase := usecase.NewApproveInspectionUsecase(
-		inspectionRepo,
-	)
-	getFormUC := usecase.NewGetFormByInspectionUsecase(
-		inspectionRepo,
-		formRepo,
-		ahuRepo,
+
+	bypassUC := usecase.NewScheduleBypassNFCUsecase(
 		scheduleRepo,
-	)
-
-	dashboardUC := usecase.NewDashboardUsecase(
-		scheduleRepo,
-		inspectionRepo,
-	)
-
-	submitInspectionFormUC := usecase.NewSubmitInspectionFormUsecase(
-		inspectionResultRepo,
-		inspectionRepo,
-		formRepo,
-		scheduleRepo, // 🔥 TAMBAH
-		inspectionPDFService,
-	)
-
-	authUC := usecase.NewAuthUsecase(userRepo)
-	userManagementUC := usecase.NewUserManagementUsecase(
-		userRepo,
 		auditRepo,
+	)
+
+	// ================= PDF =================
+	pdfService := usecase.NewSchedulePDFService(scheduleRepo)
+	inspectionPDFService := usecase.NewInspectionPDFService(inspectionRepo)
+
+	// ================= FORM TEMPLATE =================
+	createFormTemplateUC := usecase.NewCreateFormTemplateUsecase(formRepo)
+
+	getFormTemplateDetailUC := usecase.NewGetFormTemplateDetailUsecase(formRepo)
+
+	listFormTemplateUC := usecase.NewListFormTemplateUsecase(formRepo)
+
+	setFormTemplateActiveUC := usecase.NewSetFormTemplateActiveUsecase(formRepo)
+
+	createNewFormTemplateVersionUC :=
+		usecase.NewCreateNewFormTemplateVersionUsecase(formRepo)
+
+	listFormTemplateVersionsUC :=
+		usecase.NewListFormTemplateVersionsUsecase(formRepo)
+
+	compareFormTemplateUC :=
+		usecase.NewCompareFormTemplateUsecase(formRepo)
+
+	// ================= INSPECTION =================
+	inspectionTaskUC := usecase.NewInspectionTaskUsecase(scheduleRepo)
+
+	inspectionQueryUC := usecase.NewInspectionQueryUsecase(
+		inspectionRepo,
+		userRepo,
 	)
 
 	inspectionUC := usecase.NewInspectionUsecase(
@@ -129,19 +129,8 @@ func main() {
 		inspectionPDFService,
 	)
 
-	inspectionHandler := handler.NewInspectionHandler(
-		inspectionUC,
-		inspectionQueryUC,
-		scanNFCUsecase,
-		inspectionTaskUC,
-		signUC,
-		approveInspectionUsecase, // 🔥 TAMBAH
-		inspectionPDFService,     // 🔥 TAMBAH
-	)
-
-	scheduleApprovalUC := usecase.NewScheduleApprovalUsecase(
-		scheduleApprovalRepo,
-		pdfService,
+	approveInspectionUsecase := usecase.NewApproveInspectionUsecase(
+		inspectionRepo,
 	)
 
 	inspectionApprovalUC := usecase.NewInspectionApprovalUsecase(
@@ -150,9 +139,62 @@ func main() {
 		auditRepo,
 	)
 
-	auditUC := usecase.NewAuditTrailUsecase(auditRepo)
+	getFormUC := usecase.NewGetFormByInspectionUsecase(
+		inspectionRepo,
+		formRepo,
+		ahuRepo,
+		scheduleRepo,
+	)
+
+	submitInspectionFormUC := usecase.NewSubmitInspectionFormUsecase(
+		inspectionResultRepo,
+		inspectionRepo,
+		formRepo,
+		scheduleRepo,
+		inspectionPDFService,
+	)
+
+	// ================= DASHBOARD =================
+	dashboardUC := usecase.NewDashboardUsecase(
+		scheduleRepo,
+		inspectionRepo,
+	)
+
+	// ================= APPROVAL =================
+	scheduleApprovalUC := usecase.NewScheduleApprovalUsecase(
+		scheduleApprovalRepo,
+		pdfService,
+	)
 
 	// ================= HANDLER =================
+	schedulePlanHandler := handler.NewSchedulePlanHandler(schedulePlanUC)
+
+	buildingHandler := handler.NewBuildingHandler(buildingUC)
+
+	areaHandler := handler.NewAreaHandler(areaUC)
+
+	inspectionHandler := handler.NewInspectionHandler(
+		inspectionUC,
+		inspectionQueryUC,
+		scanNFCUsecase,
+		inspectionTaskUC,
+		signUC,
+		approveInspectionUsecase,
+		inspectionPDFService,
+	)
+
+	scheduleHandler := handler.NewScheduleHandler(
+		bypassUC,
+		assignScheduleUC,
+		scheduleQueryUC,
+		scheduleApprovalUC,
+	)
+
+	inspectionFormHandler := handler.NewInspectionFormHandler(
+		getFormUC,
+		submitInspectionFormUC,
+	)
+
 	handlers := handler.NewHandlers(
 		authUC,
 		userManagementUC,
@@ -167,47 +209,29 @@ func main() {
 		ahuUC,
 		createFormTemplateUC,
 		getFormTemplateDetailUC,
-		listFormTemplateUC, // ✅ HARUS DI SINI
+		listFormTemplateUC,
 		setFormTemplateActiveUC,
 		createNewFormTemplateVersionUC,
 		listFormTemplateVersionsUC,
 		compareFormTemplateUC,
-		formRepo, // ✅ PALING TERAKHIR
-	)
-
-	// bypass NFC handler
-	bypassUC := usecase.NewScheduleBypassNFCUsecase(
-		scheduleRepo,
-		auditRepo,
-	)
-
-	scheduleHandler := handler.NewScheduleHandler(
-		bypassUC,
-		assignScheduleUC,
-		scheduleQueryUC,
-		scheduleApprovalUC, // ✅ TAMBAH
-	)
-
-	inspectionFormHandler := handler.NewInspectionFormHandler(
-		getFormUC,
-		submitInspectionFormUC,
+		formRepo,
 	)
 
 	// ================= ROUTER =================
 	r := gin.Default()
 
-	// 🔥 STATIC & LIMIT
 	r.MaxMultipartMemory = 8 << 20
+
 	r.Static("/uploads", "./uploads")
 	r.Static("/api/files", "./files")
 	r.Static("/files", "./files")
+
 	r.LoadHTMLGlob("templates/*")
 
-	// 🔥 PASANG CORS DI SINI
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			"http://localhost:3000",
-			"http://172.20.10.5:3000", // HP / LAN
+			"http://10.9.118.16:3000",
 		},
 		AllowMethods: []string{
 			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
@@ -218,7 +242,6 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// ================= REGISTER ROUTES =================
 	handler.RegisterRoutes(
 		r,
 		handlers,
@@ -230,6 +253,6 @@ func main() {
 		inspectionFormHandler,
 	)
 
-	// ================= RUN SERVER =================
+	// ================= RUN =================
 	r.Run("0.0.0.0:8080")
 }

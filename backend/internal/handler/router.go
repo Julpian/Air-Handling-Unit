@@ -28,6 +28,7 @@ func RegisterRoutes(
 	secured := api.Group("")
 	secured.Use(middleware.AuthMiddleware())
 	{
+		secured.POST("/auth/logout", handlers.Logout)
 		// =================================================
 		// ================= INSPECTION GROUP ==============
 		// =================================================

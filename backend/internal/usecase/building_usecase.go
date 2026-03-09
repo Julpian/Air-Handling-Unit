@@ -9,25 +9,37 @@ import (
 
 type BuildingUsecase struct {
 	repo repository.BuildingRepository
+	auditUC *AuditTrailUsecase
 }
 
-func NewBuildingUsecase(repo repository.BuildingRepository) *BuildingUsecase {
-	return &BuildingUsecase{repo: repo}
-}
-
-func (u *BuildingUsecase) Create(
-	name string,
-	description *string,
-	createdBy string,
-) error {
-
-	b := &domain.Building{
-		ID:          uuid.NewString(),
-		Name:        name,
-		Description: description,
+func NewBuildingUsecase(repo repository.BuildingRepository, auditUC *AuditTrailUsecase) *BuildingUsecase {
+	return &BuildingUsecase{
+		repo: repo,
+		auditUC: auditUC,
 	}
+}
 
-	return u.repo.Create(b, createdBy)
+func (u *BuildingUsecase) Create(name string, description *string, adminID string, adminName string) error {
+    b := &domain.Building{
+        ID:          uuid.NewString(),
+        Name:        name,
+        Description: description,
+    }
+
+    err := u.repo.Create(b, adminID)
+    if err == nil {
+        u.auditUC.Log(&domain.AuditTrail{
+            UserID:   adminID,
+            Action:   "CREATE_BUILDING",
+            Entity:   "Building",
+            EntityID: b.ID,
+            Metadata: map[string]interface{}{
+                "name":       b.Name,
+                "admin_name": adminName,
+            },
+        })
+    }
+    return err
 }
 
 func (u *BuildingUsecase) List() ([]domain.Building, error) {

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,4 +34,21 @@ func (h *Handlers) Login(c *gin.Context) {
 		"token": token,
 		"role":  role,
 	})
+}
+
+func (h *Handlers) Logout(c *gin.Context) {
+    // Ambil data dari context (hasil extract token di middleware)
+    valID, _ := c.Get("user_id")
+    valName, _ := c.Get("user_name")
+
+    // Konversi ke string dengan aman
+    userID, _ := valID.(string)
+    userName, _ := valName.(string)
+
+    // Sekarang argumennya sudah pas: 2 string
+    h.AuthUC.Logout(userID, userName)
+
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Logout berhasil",
+    })
 }

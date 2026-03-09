@@ -78,6 +78,9 @@ func (h *Handlers) UpdateAHU(c *gin.Context) {
 }
 
 func (h *Handlers) CreateAHU(c *gin.Context) {
+	adminID := c.GetString("user_id")
+	adminName := c.GetString("user_name")
+
 	var req struct {
 		BuildingID       string  `json:"building_id"`
 		AreaID           string  `json:"area_id"`
@@ -93,8 +96,6 @@ func (h *Handlers) CreateAHU(c *gin.Context) {
 		return
 	}
 
-	adminID := c.GetString("user_id")
-
 	ahu := &domain.AHU{
 		ID:               uuid.NewString(),
 		BuildingID:       req.BuildingID,
@@ -108,7 +109,7 @@ func (h *Handlers) CreateAHU(c *gin.Context) {
 		CreatedAt:        time.Now(),
 	}
 
-	if err := h.AHUUC.Create(ahu, adminID); err != nil {
+	if err := h.AHUUC.Create(ahu, adminID, adminName); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}

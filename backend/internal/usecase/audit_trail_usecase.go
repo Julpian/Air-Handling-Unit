@@ -1,6 +1,8 @@
 package usecase
 
 import (
+	"time"
+
 	"ahu-backend/internal/domain"
 	"ahu-backend/internal/repository"
 )
@@ -17,6 +19,11 @@ func NewAuditTrailUsecase(
 
 // dipanggil dari bisnis logic (scan, approve, dll)
 func (u *AuditTrailUsecase) Log(a *domain.AuditTrail) {
+
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+
+	a.CreatedAt = time.Now().In(loc)
+
 	_ = u.repo.Save(a)
 }
 
